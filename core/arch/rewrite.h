@@ -1,5 +1,6 @@
 /**
  * @file rewrite.h
+ * @author yue tang (ytang@stu.ecnu.edu.cn)
  *
  * @copyright Copyright (c) 2024
  */
@@ -23,70 +24,73 @@ rw_func_empty(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
 instr_t * /* invalid */
 rw_func_invalid(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 1 */
+instr_t * /* invalid */
+rw_func_invalid(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
+
+instr_t * /* 1 */
 rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 2 */
+instr_t * /* 2 */
 rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 3 */
+instr_t * /* 3 */
 rw_func_vmovups(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 4 */
+instr_t * /* 4 */
 rw_func_vmovupd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 5 */
+instr_t * /* 5 */
 rw_func_vmovlps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 6 */
+instr_t * /* 6 */
 rw_func_vmovsldup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 7 */
+instr_t * /* 7 */
 rw_func_vmovlpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 8 */
+instr_t * /* 8 */
 rw_func_vmovddup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 9 */
+instr_t * /* 9 */
 rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 10 */
+instr_t * /* 10 */
 rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 11 */
+instr_t * /* 11 */
 rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 12 */
+instr_t * /* 12 */
 rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 13 */
+instr_t * /* 13 */
 rw_func_vmovhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 14 */
+instr_t * /* 14 */
 rw_func_vmovshdup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 15 */
+instr_t * /* 15 */
 rw_func_vmovhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 16 */
 rw_func_vmovaps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 17 */
+instr_t * /* 17 */
 rw_func_vmovapd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 18 */
+instr_t * /* 18 */
 rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 19 */
+instr_t * /* 19 */
 rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 20 */
+instr_t * /* 20 */
 rw_func_vmovntps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 21 */
+instr_t * /* 21 */
 rw_func_vmovntpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 22 */
+instr_t * /* 22 */
 rw_func_vcvttss2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 23 */
@@ -134,10 +138,10 @@ rw_func_vpackuswb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
 instr_t * /* 100 */
 rw_func_vmovq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 111 */
+instr_t * /* 111 */
 rw_func_vpsrlq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 112 */
+instr_t * /* 112 */
 rw_func_vpaddq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 125 */
@@ -161,6 +165,9 @@ rw_func_vpsubw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
 instr_t * /* 150 */
 rw_func_vpsubd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
+instr_t * /* 150 */
+rw_func_vpsubq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
+
 instr_t * /* 153 */
 rw_func_vpaddw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
@@ -170,11 +177,11 @@ rw_func_vpaddd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
 instr_t * /* 155 */
 rw_func_vpsrldq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 189 */
-rw_func_vpmovsxwd(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 189 */
+rw_func_vpmovsxwd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 191 */
-rw_func_vpmovsxdq(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 191 */
+rw_func_vpmovsxdq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 196 */
 rw_func_vpmovzxbw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
@@ -193,6 +200,9 @@ rw_func_vpmovzxwq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
 
 instr_t * /* 201 */
 rw_func_vpmovzxdq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
+
+instr_t * /* 211 */
+rw_func_vpmulld(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 440 */
 rw_func_vpgatherdd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
@@ -452,20 +462,20 @@ rw_func_vpermi2q(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
 instr_t * /* 643 */
 rw_func_vpermi2w(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 645 */
-rw_func_vpermt2d(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 645 */
+rw_func_vpermt2d(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 647 */
-rw_func_vpermt2ps(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 647 */
+rw_func_vpermt2ps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 648 */
-rw_func_vpermt2q(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 648 */
+rw_func_vpermt2q(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 649 */
-rw_func_vpermt2w(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 649 */
+rw_func_vpermt2w(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
-instr_t* /* 653 */
-rw_func_vpextr_(dcontext_t* dcontext, instrlist_t* ilist, instr_t* instr, app_pc instr_start);
+instr_t * /* 653 */
+rw_func_vpextr_(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 689 */
 rw_func_vpmullq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
@@ -475,9 +485,6 @@ rw_func_vporq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
 
 instr_t * /* 693 */
 rw_func_vprolq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
-
-instr_t * /* 696 */
-rw_func_vprord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);
 
 instr_t * /* 697 */
 rw_func_vprorq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start);

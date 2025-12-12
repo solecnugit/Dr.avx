@@ -1,5 +1,6 @@
 /**
  * @file rewrite_analysis.c
+ * @author yue tang (ytang@stu.ecnu.edu.cn)
  *
  * @copyright Copyright (c) 2024
  *
@@ -9,22 +10,6 @@
 
 #include "rewrite_analysis.h"
 #include "opnd_api.h"
-
-void examine_avx512_reg_liveness(dcontext_t* dcontext, instrlist_t* ilist)
-{
-    examine_mask_liveness(dcontext, ilist);
-    examine_xymm_livness(dcontext, ilist);
-}
-
-void examine_xymm_livness(dcontext_t* dcontext, instrlist_t* ilist)
-{
-
-}
-
-void examine_mask_liveness(dcontext_t* dcontext, instrlist_t* ilist)
-{
-
-}
 
 #define SET_MASK_LIVE(reg) (k_mask_liveness_bitmap |= (1 << ((reg) - DR_REG_K0)))
 #define CLEAR_MASK_LIVE(reg) (k_mask_liveness_bitmap &= ~(1 << ((reg) - DR_REG_K0)))
@@ -46,7 +31,7 @@ void examine_mask_liveness(dcontext_t* dcontext, instrlist_t* ilist)
 #define GET_ZMM_LIVE(reg) ((xyzmm_liveness_bitmap >> ((reg) - DR_REG_ZMM0)) & 1)
 
 bool
-instr_check_and_set_xmm_used(instr_t* instr)
+instr_check_and_set_xmm_used(instr_t *instr)
 {
     int idx;
     opnd_t opnd;
@@ -75,19 +60,19 @@ instr_check_and_set_xmm_used(instr_t* instr)
 }
 
 bool
-instr_check_and_set_ymm_used(instr_t* instr)
+instr_check_and_set_ymm_used(instr_t *instr)
 {
     return NO_YMM;
 }
 
 bool
-instr_check_and_set_zmm_used(instr_t* instr)
+instr_check_and_set_zmm_used(instr_t *instr)
 {
     return NO_ZMM;
 }
 
 bool
-instr_may_read_write_opmask_register(instr_t* instr) // manully add same feat in each rewrite func is more effecient
+instr_may_read_write_opmask_register(instr_t *instr) // manully add same feat in each rewrite func is more effecient
 {
     return false;
 }

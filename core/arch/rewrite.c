@@ -1,5 +1,6 @@
 /**
  * @file rewrite.c
+ * @author yue tang (ytang@stu.ecnu.edu.cn)
  *
  * @copyright Copyright (c) 2024
  *
@@ -197,7 +198,7 @@ instr_rewrite_func_t *rewrite_funcs[] = {
     /* 148 OP_AVX512_vpsubb */ rw_func_vpsubb,
     /* 149 OP_AVX512_vpsubw */ rw_func_vpsubw,
     /* 150 OP_AVX512_vpsubd */ rw_func_vpsubd,
-    /* 151 OP_AVX512_vpsubq */ rw_func_empty,
+    /* 151 OP_AVX512_vpsubq */ rw_func_vpsubq,
     /* 152 OP_AVX512_vpaddb */ rw_func_empty,
     /* 153 OP_AVX512_vpaddw */ rw_func_vpaddw,
     /* 154 OP_AVX512_vpaddd */ rw_func_vpaddd,
@@ -257,7 +258,7 @@ instr_rewrite_func_t *rewrite_funcs[] = {
     /* 208 OP_AVX512_vpmaxsd */ rw_func_empty,
     /* 209 OP_AVX512_vpmaxuw */ rw_func_empty,
     /* 210 OP_AVX512_vpmaxud */ rw_func_empty,
-    /* 211 OP_AVX512_vpmulld */ rw_func_empty,
+    /* 211 OP_AVX512_vpmulld */ rw_func_vpmulld,
     /* 212 OP_AVX512_vphminposuw */ rw_func_empty,
     /* 213 OP_AVX512_vaesimc */ rw_func_empty,
     /* 214 OP_AVX512_vaesenc */ rw_func_empty,
@@ -742,7 +743,7 @@ instr_rewrite_func_t *rewrite_funcs[] = {
     /* 693 OP_AVX512_vprolq */ rw_func_vprolq,
     /* 694 OP_AVX512_vprolvd */ rw_func_empty,
     /* 695 OP_AVX512_vprolvq */ rw_func_empty,
-    /* 696 OP_AVX512_vprord */ rw_func_vprord,
+    /* 696 OP_AVX512_vprord */ rw_func_empty,
     /* 697 OP_AVX512_vprorq */ rw_func_vprorq,
     /* 698 OP_AVX512_vprorvd */ rw_func_empty,
     /* 699 OP_AVX512_vprorvq */ rw_func_empty,
@@ -834,7 +835,7 @@ void
 exec_rewrite_avx512_bb(dcontext_t *dcontext, instrlist_t *ilist)
 {
     instr_t *instr, *next_instr, *prev_avx512_instr;
-
+    // app_pc UNKNOWN = 0x0;
     instr_t *first_avx512_instr_prev = NULL;
     instr_t *last_avx512_instr_next = NULL;
 
@@ -928,14 +929,14 @@ rw_func_invalid(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
     return NULL_INSTR;
 }
 
-instr_t* /* 1 */
+instr_t * /* 1 */
 rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -949,7 +950,8 @@ rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -1030,7 +1032,8 @@ rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vmovss spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -1054,7 +1057,8 @@ rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vmovss src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -1119,7 +1123,8 @@ rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vmovss src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -1146,7 +1151,8 @@ rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vmovss spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -1278,14 +1284,14 @@ rw_func_vmovss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
     return NULL_INSTR;
 }
 
-instr_t* /* 2 */
+instr_t * /* 2 */
 rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -1299,7 +1305,8 @@ rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -1380,7 +1387,8 @@ rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vmovss spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vmovss, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -1404,7 +1412,8 @@ rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vmovss src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -1469,7 +1478,8 @@ rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vmovss src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -1496,7 +1506,8 @@ rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vmovss spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vmovss, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -1628,14 +1639,12 @@ rw_func_vmovsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
     return NULL_INSTR;
 }
 
-
-
-instr_t* /* 3 */
+instr_t * /* 3 */
 rw_func_vmovups(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -1726,17 +1735,16 @@ rw_func_vmovups(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
-instr_t* /* 4 */
+instr_t * /* 4 */
 rw_func_vmovupd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -1827,17 +1835,16 @@ rw_func_vmovupd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
-instr_t* /* 5 */
+instr_t * /* 5 */
 rw_func_vmovlps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -1927,18 +1934,17 @@ rw_func_vmovlps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
 #endif
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
-        } break;
-        default:
-        return NULL;
+    } break;
+    default: return NULL;
     }
 }
 
-instr_t* /* 6 */
+instr_t * /* 6 */
 rw_func_vmovsldup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -2028,18 +2034,17 @@ rw_func_vmovsldup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
 #endif
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
-        } break;
-        default:
-        return NULL;
+    } break;
+    default: return NULL;
     }
 }
 
-instr_t* /* 7 */
+instr_t * /* 7 */
 rw_func_vmovlpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -2129,18 +2134,17 @@ rw_func_vmovlpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
 #endif
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
-        } break;
-        default:
-         return NULL;
-     }
+    } break;
+    default: return NULL;
+    }
 }
 
-instr_t* /* 8 */
+instr_t * /* 8 */
 rw_func_vmovddup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -2231,19 +2235,18 @@ rw_func_vmovddup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 9 */
+instr_t * /* 9 */
 rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -2257,7 +2260,8 @@ rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -2338,7 +2342,8 @@ rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpcklps spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -2362,7 +2367,8 @@ rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vunpcklps src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -2427,7 +2433,8 @@ rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpcklps src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -2454,7 +2461,8 @@ rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vunpcklps spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpcklps, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -2579,19 +2587,18 @@ rw_func_vunpcklps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return i1;
         }
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 10 */
+instr_t * /* 10 */
 rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -2605,7 +2612,8 @@ rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -2686,7 +2694,8 @@ rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpcklpd spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -2710,7 +2719,8 @@ rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vunpcklpd src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -2775,7 +2785,8 @@ rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpcklpd src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -2802,7 +2813,8 @@ rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vunpcklpd spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpcklpd, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -2927,19 +2939,18 @@ rw_func_vunpcklpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return i1;
         }
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 11 */
+instr_t * /* 11 */
 rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -2953,7 +2964,8 @@ rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -3034,7 +3046,8 @@ rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpckhps spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -3058,7 +3071,8 @@ rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vunpckhps src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -3123,7 +3137,8 @@ rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpckhps src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -3150,7 +3165,8 @@ rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vunpckhps spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpckhps, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -3275,19 +3291,18 @@ rw_func_vunpckhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return i1;
         }
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 12 */
+instr_t * /* 12 */
 rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -3301,7 +3316,8 @@ rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -3382,7 +3398,8 @@ rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpckhpd spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -3406,7 +3423,8 @@ rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vunpckhpd src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -3471,7 +3489,8 @@ rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vunpckhpd src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -3498,7 +3517,8 @@ rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vunpckhpd spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vunpckhpd, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -3623,17 +3643,16 @@ rw_func_vunpckhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return i1;
         }
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 13 */
+instr_t * /* 13 */
 rw_func_vmovhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -3724,17 +3743,16 @@ rw_func_vmovhps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 14 */
+instr_t * /* 14 */
 rw_func_vmovshdup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -3825,17 +3843,16 @@ rw_func_vmovshdup(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
-instr_t* /* 15 */
+instr_t * /* 15 */
 rw_func_vmovhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -3926,9 +3943,8 @@ rw_func_vmovhpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-         return NULL;
-     }
+    default: return NULL;
+    }
 }
 
 /* ==============================================
@@ -3949,21 +3965,21 @@ vmovaps_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
     case 0: { /* no spill */
         // Convert ZMM to YMM pairs for both src and dst
         reg_id_t src1_lower = ZMM_TO_YMM(src1_reg);
-        reg_id_t src1_upper = find_one_available_spill_ymm(src1_lower);
         reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
-        reg_id_t dst_upper = find_one_available_spill_ymm(dst_lower);
+        reg_id_t src1_upper = find_available_spill_ymm_avoiding(src1_lower, dst_lower, DR_REG_NULL);
+        reg_id_t dst_upper = find_available_spill_ymm_avoiding(src1_lower, src1_upper, dst_lower);
 
-        opnd_t op_src1_lower = create_mapping_ymm_opnd(dcontext, src1_lower);
-        opnd_t op_src1_upper = create_mapping_ymm_opnd(dcontext, src1_upper);
-        opnd_t op_dst_lower = create_mapping_ymm_opnd(dcontext, dst_lower);
-        opnd_t op_dst_upper = create_mapping_ymm_opnd(dcontext, dst_upper);
+        opnd_t op_src1_lower = opnd_create_reg(src1_lower);
+        opnd_t op_src1_upper = opnd_create_reg(src1_upper);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+        opnd_t op_dst_upper = opnd_create_reg(dst_upper);
 
         // src1_upper -> tls(src1_upper)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
         // dst_upper -> tls(dst_upper)
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_upper)), OPSZ_32);
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_upper)), OPSZ_32);
         // tls(src1_upper) -> src1_upper (restore src1 high part)
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_upper,
                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
@@ -3975,25 +3991,26 @@ vmovaps_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         // vmovaps src1_upper -> dst_upper
         instr_t *i6 = INSTR_CREATE_vmovaps(dcontext, op_dst_upper, op_src1_upper);
         // dst_lower -> tls(dst_lower)
-        instr_t *i7 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i7 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
         // dst_upper -> tls(dst_upper)
         instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_upper,
                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
         // tls(src1_upper) -> src1_upper (restore original)
-        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
+        instr_t *i9 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
         // tls(dst_upper) -> dst_upper (restore original)
-        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_upper)), OPSZ_32);
+        instr_t *i10 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_upper)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
 #endif
         instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
         return i1;
     } break;
-    case 1: /* src1 need spill */
-    case 2: /* dst need spill */
+    case 1: { /* src1 need spill */
+    } break;
+    case 2: { /* dst need spill */
+    } break;
     case 3: { /* both src1 and dst need spill */
         // For spill cases, use two YMM spill slots
         reg_id_t spill_src1_lower = find_one_available_spill_ymm(DR_REG_NULL);
@@ -4025,8 +4042,8 @@ vmovaps_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         // vmovaps spill_src1_upper -> spill_dst_upper
         instr_t *i8 = INSTR_CREATE_vmovaps(dcontext, op_spill_dst_upper, op_spill_src1_upper);
         // Store result to destination ZMM
-        instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i9 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_upper,
                                               TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
         // Restore all spill registers
@@ -4098,13 +4115,13 @@ vmovaps_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         opnd_t src1_opnd = create_mapping_ymm_opnd(dcontext, src1_reg);
 
         // spill_dst_reg -> tls(spill_dst_reg)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // VMOVAPS ymm1, ymm2/m256
         instr_t *i2 = INSTR_CREATE_vmovaps(dcontext, spill_dst_opnd, src1_opnd);
         // spill_dst_reg -> tls(dst_reg)
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
@@ -4119,19 +4136,18 @@ vmovaps_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         opnd_t spill_opnd = create_mapping_ymm_opnd(dcontext, spill_reg);
 
         // spill_reg -> tls(spill_reg)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_reg)), OPSZ_32);
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_reg)), OPSZ_32);
         // tls(src1_reg) -> spill_reg
-        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
         // VMOVAPS ymm1, ymm2/m256
         instr_t *i3 = INSTR_CREATE_vmovaps(dcontext, spill_opnd, spill_opnd);
         // spill_reg -> tls(dst_reg)
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_reg) -> spill_reg
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_reg)), OPSZ_32);
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_reg)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
@@ -4170,7 +4186,7 @@ vmovaps_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         opnd_t dst_opnd = opnd_create_reg(dst_reg);
 
         // spill_src1_reg -> tls(spill_src1_reg)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg, 
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
         // tls(src1_reg) -> spill_src1_reg
         instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
@@ -4192,13 +4208,13 @@ vmovaps_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         opnd_t src1_opnd = opnd_create_reg(src1_reg);
 
         // spill_dst_reg -> tls(spill_dst_reg)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // VMOVAPS xmm1, xmm2/m128
         instr_t *i2 = INSTR_CREATE_vmovaps(dcontext, spill_dst_opnd, src1_opnd);
         // spill_dst_reg -> tls(dst_reg)
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
@@ -4213,19 +4229,18 @@ vmovaps_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
         opnd_t spill_opnd = opnd_create_reg(spill_reg);
 
         // spill_reg -> tls(spill_reg)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg,
-                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
         // tls(src1_reg) -> spill_reg
-        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
         // VMOVAPS xmm1, xmm2/m128
         instr_t *i3 = INSTR_CREATE_vmovaps(dcontext, spill_opnd, spill_opnd);
         // spill_reg -> tls(dst_reg)
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg,
-                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_reg) -> spill_reg
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
@@ -4260,22 +4275,20 @@ vmovaps_zmm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *inst
         opnd_t op_src1_upper = create_mapping_ymm_opnd(dcontext, src1_upper);
 
         // src1_upper -> tls(src1_upper)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
         // tls(src1_upper_half) -> src1_upper
         instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_upper,
                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
         // vmovaps src1_lower -> dst_lower
-        instr_t *i3 = INSTR_CREATE_vmovaps(dcontext,
-                                           opnd_create_base_disp(base_reg, index_reg, scale, disp, OPSZ_32),
+        instr_t *i3 = INSTR_CREATE_vmovaps(dcontext, opnd_create_base_disp(base_reg, index_reg, scale, disp, OPSZ_32),
                                            op_src1_lower);
         // vmovaps src1_upper -> dst_upper
-        instr_t *i4 = INSTR_CREATE_vmovaps(dcontext,
-                                           opnd_create_base_disp(base_reg, index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
-                                           op_src1_upper);
+        instr_t *i4 = INSTR_CREATE_vmovaps(
+            dcontext, opnd_create_base_disp(base_reg, index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32), op_src1_upper);
         // tls(src1_upper) -> src1_upper
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_upper)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
@@ -4303,13 +4316,12 @@ vmovaps_zmm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *inst
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_upper,
                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
         // vmovaps spill_src1_lower -> dst_lower
-        instr_t *i5 = INSTR_CREATE_vmovaps(dcontext,
-                                           opnd_create_base_disp(base_reg, index_reg, scale, disp, OPSZ_32),
+        instr_t *i5 = INSTR_CREATE_vmovaps(dcontext, opnd_create_base_disp(base_reg, index_reg, scale, disp, OPSZ_32),
                                            op_spill_src1_lower);
         // vmovaps spill_src1_upper -> dst_upper
-        instr_t *i6 = INSTR_CREATE_vmovaps(dcontext,
-                                           opnd_create_base_disp(base_reg, index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
-                                           op_spill_src1_upper);
+        instr_t *i6 = INSTR_CREATE_vmovaps(
+            dcontext, opnd_create_base_disp(base_reg, index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
+            op_spill_src1_upper);
         // tls(spill_src1_lower) -> spill_src1_lower
         instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
@@ -4330,15 +4342,50 @@ instr_t *
 vmovaps_ymm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, opnd_t dst_opnd,
                          reg_id_t mask_reg)
 {
-    opnd_t src1_opnd = create_mapping_ymm_opnd(dcontext, src1_reg);
-    // VEX.256.0F.WIG 28 /r VMOVAPS ymm1, ymm2/m256
-    instr_t *i1 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, src1_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, i1);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    return i1;
+
+    const uint src1_need_spill = NEED_SPILL_YMM(src1_reg) ? 1 : 0;
+
+    switch (src1_need_spill) {
+    case 0: {
+        // don't need spill
+        {
+            opnd_t src1_opnd = opnd_create_reg(src1_reg);
+            // VEX.256.0F.WIG 29 /r VMOVAPS ymm2/m256, ymm1
+            instr_t *i1 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, src1_opnd);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        }
+    } break;
+    case 1: {
+        // src1 need spill
+        {
+            reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
+            opnd_t spill_src1_opnd = opnd_create_reg(spill_src1_reg);
+
+            // spill_src1_reg -> tls(spill_src1_reg)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // tls(src1_reg) -> spill_src1_reg
+            instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+            // VEX.256.0F.WIG 29 /r VMOVAPS ymm2/m256, ymm1
+            instr_t *i3 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, spill_src1_opnd);
+            // tls(spill_src1_reg) -> spill_src1_reg
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+            return i1;
+        }
+    } break;
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -4484,16 +4531,46 @@ instr_t *
 vmovaps_ymm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src1_opnd, reg_id_t dst_reg,
                          reg_id_t mask_reg)
 {
-    opnd_t dst_opnd = opnd_create_reg(dst_reg); 
-
-    // VEX.256.0F.WIG 28 /r VMOVAPS ymm1, ymm2/m256
-    instr_t *new_instr1 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, src1_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, new_instr1);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    return new_instr1;
+
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: // don't need spill
+    {
+        opnd_t dst_opnd = opnd_create_reg(dst_reg);
+        // VEX.256.0F.WIG 29 /r VMOVAPS ymm2/m256, ymm1
+        instr_t *i1 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, src1_opnd);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    } break;
+    case 1: { // dst need spill
+        reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+        opnd_t spill_dst_opnd = opnd_create_reg(spill_dst_reg);
+
+        // spill_dst_reg -> tls(spill_dst_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        // VMOVAPS ymm2/m256, ymm1
+        instr_t *i2 = INSTR_CREATE_vmovaps(dcontext, spill_dst_opnd, src1_opnd);
+        // spill_dst_reg -> tls(dst_reg)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(spill_dst_reg) -> spill_dst_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vmovaps_ymm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -4510,32 +4587,32 @@ vmovaps_xmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *inst
     {
         opnd_t dst_opnd = opnd_create_reg(dst_reg);
         // VEX.128.0F.WIG 29 /r VMOVAPS xmm2/m128, xmm1
-        instr_t *new_instr1 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, src1_opnd);
+        instr_t *i1 = INSTR_CREATE_vmovaps(dcontext, dst_opnd, src1_opnd);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 1, new_instr1);
+        print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
-        return new_instr1;
+        return i1;
     } break;
     case 1: { // dst need spill
-        reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(dst_reg, DR_REG_NULL, DR_REG_NULL);
-        opnd_t spill_dst_opnd = create_mapping_xmm_opnd(dcontext, spill_dst_reg);
+        reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
+        opnd_t spill_dst_opnd = opnd_create_reg(spill_dst_reg);
 
         // spill_dst_reg -> tls(spill_dst_reg)
-        instr_t *new_instr1 =
+        instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // VMOVAPS xmm2/m128, xmm1
-        instr_t *new_instr2 = INSTR_CREATE_vmovaps(dcontext, spill_dst_opnd, src1_opnd);
+        instr_t *i2 = INSTR_CREATE_vmovaps(dcontext, spill_dst_opnd, src1_opnd);
         // spill_dst_reg -> tls(dst_reg)
-        instr_t *new_instr3 =
+        instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_dst_reg) -> spill_dst_reg
-        instr_t *new_instr4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                          TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 4, new_instr1, new_instr2, new_instr3, new_instr4);
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
 #endif
-        instrlist_concat_next_instr(ilist, 4, new_instr1, new_instr2, new_instr3, new_instr4);
-        return new_instr1;
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
     } break;
     default: REWRITE_ERROR(STD_ERRF, "vmovaps_xmm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
     }
@@ -4592,13 +4669,12 @@ rw_func_vmovaps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
     return NULL_INSTR;
 }
 
-
-instr_t* /* 17 */
+instr_t * /* 17 */
 rw_func_vmovapd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -4689,19 +4765,18 @@ rw_func_vmovapd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
-instr_t* /* 18 */
+instr_t * /* 18 */
 rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -4715,7 +4790,8 @@ rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -4796,7 +4872,8 @@ rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vcvtsi2ss spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -4820,7 +4897,8 @@ rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vcvtsi2ss src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -4885,7 +4963,8 @@ rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vcvtsi2ss src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -4912,7 +4991,8 @@ rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vcvtsi2ss spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vcvtsi2ss, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -5037,20 +5117,19 @@ rw_func_vcvtsi2ss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return i1;
         }
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
     return NULL;
 }
 
-instr_t* /* 19 */
+instr_t * /* 19 */
 rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5064,7 +5143,8 @@ rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -5145,7 +5225,8 @@ rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vcvtsi2sd spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -5169,7 +5250,8 @@ rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vcvtsi2sd src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -5234,7 +5316,8 @@ rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vcvtsi2sd src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -5261,7 +5344,8 @@ rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vcvtsi2sd spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vcvtsi2sd, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -5386,18 +5470,17 @@ rw_func_vcvtsi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return i1;
         }
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
     return NULL;
 }
 
-instr_t* /* 20 */
+instr_t * /* 20 */
 rw_func_vmovntps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5488,17 +5571,16 @@ rw_func_vmovntps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
-instr_t* /* 21 */
+instr_t * /* 21 */
 rw_func_vmovntpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5589,17 +5671,16 @@ rw_func_vmovntpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
-instr_t* /* 22 */
+instr_t * /* 22 */
 rw_func_vcvttss2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5690,9 +5771,201 @@ rw_func_vcvttss2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
+}
+
+/**
+ * 23
+ * @brief rewrite vcvttsd2si
+ */
+instr_t *
+rw_func_vcvttsd2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+    // vcvttsd2si - Convert with Truncation Scalar Double-Precision Floating-Point Value to Signed Integer
+    // VEX.LIG.F2.0F.W1 2C /r VCVTTSD2SI r64, xmm1/m64
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
+
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "vcvttsd2si", true, true, false, true);
+    REWRITE_INFO(STD_OUTF, "==== Rewriting vcvttsd2si at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
+#endif
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // Check if source XMM register needs spilling
+    if (opnd_is_reg(src_opnd)) {
+        reg_id_t src_xmm_reg = opnd_get_reg(src_opnd);
+        const uint need_spill_xmm_src = NEED_SPILL_XMM(src_xmm_reg) ? 1 : 0;
+
+        if (!need_spill_xmm_src) {
+            // No spill needed - direct conversion
+            instr_t *i1 = INSTR_CREATE_vcvttsd2si(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } else {
+            // Source XMM register needs spilling
+            reg_id_t spill_src_reg = XMM_SPILL_SLOT0;
+            opnd_t op_src_spill = opnd_create_reg(spill_src_reg);
+
+            // tls(src_reg) -> spill_src_reg
+            instr_t *i1 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src_xmm_reg)), OPSZ_16);
+            // vcvttsd2si spill_src_reg -> dst
+            instr_t *i2 = INSTR_CREATE_vcvttsd2si(dcontext, dst_opnd, op_src_spill);
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+#endif
+            instrlist_concat_next_instr(ilist, 2, i1, i2);
+            return i1;
+        }
+    } else if (opnd_is_memory_reference(src_opnd)) {
+        // Source is memory reference - direct conversion
+        instr_t *i1 = INSTR_CREATE_vcvttsd2si(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    }
+
+    return NULL_INSTR;
+}
+
+/**
+ * @brief 24 vcvtss2si
+ * vcvtss2si %xmm0[4byte] -> %rax
+ */
+instr_t *
+rw_func_vcvtss2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+    // vcvtss2si - Convert Scalar Single-Precision Floating-Point Value to Signed Integer
+    // VEX.LIG.F3.0F.W0 2D /r VCVTSS2SI r32, xmm1/m32
+    // VEX.LIG.F3.0F.W1 2D /r VCVTSS2SI r64, xmm1/m32
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
+
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "vcvtss2si", true, true, false, true);
+    REWRITE_INFO(STD_OUTF, "==== Rewriting vcvtss2si at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
+#endif
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // Check if source XMM register needs spilling
+    if (opnd_is_reg(src_opnd)) {
+        reg_id_t src_xmm_reg = opnd_get_reg(src_opnd);
+        const uint need_spill_xmm_src = NEED_SPILL_XMM(src_xmm_reg) ? 1 : 0;
+
+        if (!need_spill_xmm_src) {
+            // No spill needed - direct conversion
+            instr_t *i1 = INSTR_CREATE_vcvtss2si(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } else {
+            // Source XMM register needs spilling
+            reg_id_t spill_src_reg = XMM_SPILL_SLOT0;
+            opnd_t op_src_spill = opnd_create_reg(spill_src_reg);
+
+            // tls(src_reg) -> spill_src_reg
+            instr_t *i1 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src_xmm_reg)), OPSZ_16);
+            // vcvtss2si spill_src_reg -> dst
+            instr_t *i2 = INSTR_CREATE_vcvtss2si(dcontext, dst_opnd, op_src_spill);
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+#endif
+            instrlist_concat_next_instr(ilist, 2, i1, i2);
+            return i1;
+        }
+    } else if (opnd_is_memory_reference(src_opnd)) {
+        // Source is memory reference - direct conversion
+        instr_t *i1 = INSTR_CREATE_vcvtss2si(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    }
+
+    return NULL_INSTR;
+}
+
+instr_t * /* 25 */
+rw_func_vcvtsd2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+    // vcvtsd2si - Convert Scalar Double-Precision Floating-Point Value to Signed Integer
+    // VEX.LIG.F2.0F.W0 2D /r VCVTSD2SI r32, xmm1/m64
+    // VEX.LIG.F2.0F.W1 2D /r VCVTSD2SI r64, xmm1/m64
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
+
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "vcvtsd2si", true, true, false, true);
+    REWRITE_INFO(STD_OUTF, "==== Rewriting vcvtsd2si at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
+#endif
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // Check if source XMM register needs spilling
+    if (opnd_is_reg(src_opnd)) {
+        reg_id_t src_xmm_reg = opnd_get_reg(src_opnd);
+        const uint need_spill_xmm_src = NEED_SPILL_XMM(src_xmm_reg) ? 1 : 0;
+
+        if (!need_spill_xmm_src) {
+            // No spill needed - direct conversion
+            instr_t *i1 = INSTR_CREATE_vcvtsd2si(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } else {
+            // Source XMM register needs spilling
+            reg_id_t spill_src_reg = XMM_SPILL_SLOT0;
+            opnd_t op_src_spill = opnd_create_reg(spill_src_reg);
+
+            // tls(src_reg) -> spill_src_reg
+            instr_t *i1 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src_xmm_reg)), OPSZ_16);
+            // vcvtsd2si spill_src_reg -> dst
+            instr_t *i2 = INSTR_CREATE_vcvtsd2si(dcontext, dst_opnd, op_src_spill);
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+#endif
+            instrlist_concat_next_instr(ilist, 2, i1, i2);
+            return i1;
+        }
+    } else if (opnd_is_memory_reference(src_opnd)) {
+        // Source is memory reference - direct conversion
+        instr_t *i1 = INSTR_CREATE_vcvtsd2si(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    }
+
+    return NULL_INSTR;
 }
 
 instr_t * /* 26 */
@@ -5700,7 +5973,7 @@ rw_func_vucomiss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 1));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5793,8 +6066,7 @@ rw_func_vucomiss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
@@ -5803,7 +6075,7 @@ rw_func_vucomisd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 1));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5896,8 +6168,7 @@ rw_func_vucomisd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
@@ -5906,7 +6177,7 @@ rw_func_vcomiss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 1));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -5999,8 +6270,7 @@ rw_func_vcomiss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
@@ -6009,7 +6279,7 @@ rw_func_vcomisd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 1));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6102,8 +6372,7 @@ rw_func_vcomisd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
@@ -6112,7 +6381,7 @@ rw_func_vmovmskps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6203,8 +6472,7 @@ rw_func_vmovmskps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
@@ -6213,7 +6481,7 @@ rw_func_vmovmskpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6304,8 +6572,7 @@ rw_func_vmovmskpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
@@ -6314,7 +6581,7 @@ rw_func_vsqrtps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6405,19 +6672,18 @@ rw_func_vsqrtps(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
 instr_t * /* 33 */
 rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6431,7 +6697,8 @@ rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -6512,7 +6779,8 @@ rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vsqrtss spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -6536,7 +6804,8 @@ rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vsqrtss src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -6601,7 +6870,8 @@ rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vsqrtss src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -6628,7 +6898,8 @@ rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vsqrtss spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vsqrtss, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -6753,8 +7024,7 @@ rw_func_vsqrtss(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
             return i1;
         }
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
     return NULL;
 }
@@ -6764,7 +7034,7 @@ rw_func_vsqrtpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
 {
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 0));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6855,19 +7125,18 @@ rw_func_vsqrtpd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
         return i1;
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
 }
 
 instr_t * /* 35 */
 rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
-    
+
     reg_id_t src1_reg = opnd_get_reg(instr_get_src(instr, 1));
     reg_id_t src2_reg = opnd_get_reg(instr_get_src(instr, 2));
     reg_id_t dst_reg = opnd_get_reg(instr_get_dst(instr, 0));
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -6881,7 +7150,8 @@ rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_dst, op_src1, op_src2);;
+        instr_t *i1 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_dst, op_src1, op_src2);
+        ;
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -6962,7 +7232,8 @@ rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vsqrtsd spill_src1 spill_src2 -> dst
-        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_dst, op_spill_src1, op_spill_src2);;
+        instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_dst, op_spill_src1, op_spill_src2);
+        ;
         // tls(spill_src1) -> spill_src1
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
@@ -6986,7 +7257,8 @@ rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vsqrtsd src1 src2 -> spill_dst
-        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_spill_dst, op_src1, op_src2);;
+        instr_t *i2 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_spill_dst, op_src1, op_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -7051,7 +7323,8 @@ rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
         // vsqrtsd src1 spill_src2 -> spill_dst
-        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_spill_dst, op_src1, op_spill_src2);;
+        instr_t *i4 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_spill_dst, op_src1, op_spill_src2);
+        ;
         // spill_dst -> tls(dst)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -7078,7 +7351,8 @@ rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
             instr_t *i2 =
                 RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
             // vsqrtsd spill spill -> spill
-            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_spill, op_spill, op_spill);;
+            instr_t *i3 = instr_create_1dst_2src(dcontext, OP_vsqrtsd, op_spill, op_spill, op_spill);
+            ;
             // spill -> tls(dst)
             instr_t *i4 =
                 SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
@@ -7203,24 +7477,9 @@ rw_func_vsqrtsd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
             return i1;
         }
     } break;
-    default:
-        return NULL;
+    default: return NULL;
     }
     return NULL;
-}
-
-
-/**
- * @brief rewrite vcvttsd2si
- */
-instr_t *
-rw_func_vcvttsd2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
-#ifdef DEBUG
-    print_rewrite_info(dcontext, ilist, instr, instr_start, "vcvtsd2si", true, true, false, true);
-#endif
-    // VEX.LIG.F2.0F.W1 2C /r 1 VCVTTSD2SI r64, xmm1/m64
-    return instr;
 }
 
 /* ==============================================
@@ -7739,6 +7998,606 @@ instr_t *
 vpaddq_zmm_reg_reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
                        reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src1_reg_lower = DR_REG_NULL;
+    reg_id_t src1_reg_upper = DR_REG_NULL;
+    reg_id_t src2_reg_lower = DR_REG_NULL;
+    reg_id_t src2_reg_upper = DR_REG_NULL;
+    reg_id_t dst_reg_lower = DR_REG_NULL;
+    reg_id_t dst_reg_upper = DR_REG_NULL;
+
+    const uint src1_need_spill = NEED_SPILL_ZMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_ZMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { /* no spill */
+        if (src1_reg == dst_reg) {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = src1_reg_lower;
+            src1_reg_upper = find_available_spill_ymm_avoiding_variadic(2, src1_reg_lower, src2_reg_lower);
+            src2_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, src1_reg_upper);
+            dst_reg_upper = src1_reg_upper;
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vaddd
+            instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i7 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+#endif
+            instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+            return i1;
+        } else {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            src1_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+            src2_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                        dst_reg_lower, src1_reg_upper);
+            dst_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                       src1_reg_upper, src2_reg_upper);
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // save dst-up -> tls(dst-up)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vaddd
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i8 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // restore dst-up from tls(dst-up)
+            instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+#endif
+            instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+            return i1;
+        }
+    } break;
+    case 1: { /* src1 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src1 needs special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src2 needs special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 3: { /* both src1 and src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and src2 need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i12 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18);
+#endif
+        instrlist_concat_next_instr(ilist, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - dst needs special handling
+        reg_id_t spill_dst_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_dst_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load upper parts of source registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i9 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+#endif
+        instrlist_concat_next_instr(ilist, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+        return i1;
+    } break;
+    case 5: { /* both src1 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and dst need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 6: { /* both src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src2 and dst need special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 7: { /* all src1, src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - all registers need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(
+            5, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(
+            6, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                    src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(8, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                   src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i6 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(spill_dst_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i12 = instr_create_1dst_2src(dcontext, OP_vpaddq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i13 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i19 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i20 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18, i19, i20);
+#endif
+        instrlist_concat_next_instr(ilist, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18, i19, i20);
+        return i1;
+    } break;
+    }
     return NULL_INSTR;
 }
 
@@ -9177,11 +10036,9 @@ vpsllq_xmm2xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg
         reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
         reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
@@ -9212,22 +10069,16 @@ vpsllq_xmm2xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg
     case 4: { /* dst need spill */
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
 
-
         // spill_dst -> tls(spill_dst)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vpsllq src1 src2 -> spill_dst
         instr_t *i2 = INSTR_CREATE_vpsllq(dcontext, op_spill_dst, op_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_dst) -> spill_dst
@@ -9243,18 +10094,14 @@ vpsllq_xmm2xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg
         reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // tls(src1) -> spill_src1
@@ -9263,8 +10110,6 @@ vpsllq_xmm2xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg
         // vpsllq spill_src1 src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsllq(dcontext, op_spill_dst, op_spill_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_src1) -> spill_src1
@@ -9283,18 +10128,14 @@ vpsllq_xmm2xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg
         reg_id_t spill_src2_reg = XMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT1;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src2 -> tls(spill_src2)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
                                              TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // tls(src2) -> spill_src2
@@ -9303,8 +10144,6 @@ vpsllq_xmm2xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg
         // vpsllq src1 spill_src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsllq(dcontext, op_spill_dst, op_src1, op_spill_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_src2) -> spill_src2
@@ -9601,7 +10440,7 @@ instr_t *
 rw_func_vpsllq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
     opnd_t mask_opnd = instr_get_src(instr, 0);
-    opnd_t imm8_or_src1_opnd = instr_get_src(instr, 1);
+    opnd_t imm8_or_src1_opnd = instr_get_src(instr, 1); // TODO: ensure imm8 is first or second src
     opnd_t src2_opnd = instr_get_src(instr, 2);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
@@ -9768,7 +10607,6 @@ vpsubb_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
     } break;
 
     case 7: { /* all need spill (src1, src2, dst) */
-        /* Reuse the robust triple-spill templates you already use for vpaddw/vpsubd */
         reg_id_t spill_src1 = YMM_SPILL_SLOT0;
         reg_id_t spill_src2 = YMM_SPILL_SLOT1;
         reg_id_t spill_dst = spill_src1;
@@ -9825,7 +10663,7 @@ rw_func_vpsubb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         return vpsubb_xmm_and_xmm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
     if (IS_ZMM_REG(dst_reg)) {
         REWRITE_INFO(STD_OUTF, "vpsubb zmm not implemented\n");
-        return NULL_INSTR; /* or split zmm→two ymm, like vpsubd_zmm_and_zmm_gen */
+        return NULL_INSTR; /* or split zmm→two ymm, like vpaddd_zmm_and_zmm_gen */
     }
     REWRITE_INFO(STD_OUTF, "vpsubb pattern not support\n");
     return NULL_INSTR;
@@ -9916,11 +10754,9 @@ vpsubw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
         reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
@@ -9951,22 +10787,16 @@ vpsubw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
     case 4: { /* dst need spill */
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
 
-
         // spill_dst -> tls(spill_dst)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // vpsubw src1 src2 -> spill_dst
         instr_t *i2 = INSTR_CREATE_vpsubw(dcontext, op_spill_dst, op_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_dst) -> spill_dst
@@ -9982,18 +10812,14 @@ vpsubw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // tls(src1) -> spill_src1
@@ -10002,8 +10828,6 @@ vpsubw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         // vpsubw spill_src1 src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsubw(dcontext, op_spill_dst, op_spill_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_src1) -> spill_src1
@@ -10022,18 +10846,14 @@ vpsubw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src2_reg = XMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT1;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src2 -> tls(spill_src2)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
                                              TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
         // tls(src2) -> spill_src2
@@ -10042,8 +10862,6 @@ vpsubw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         // vpsubw src1 spill_src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsubw(dcontext, op_spill_dst, op_src1, op_spill_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
         // tls(spill_src2) -> spill_src2
@@ -10284,11 +11102,9 @@ vpsubw_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
         reg_id_t spill_src2_reg = YMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
@@ -10319,22 +11135,16 @@ vpsubw_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
     case 4: { /* dst need spill */
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
 
-
         // spill_dst -> tls(spill_dst)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // vpsubw src1 src2 -> spill_dst
         instr_t *i2 = INSTR_CREATE_vpsubw(dcontext, op_spill_dst, op_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_dst) -> spill_dst
@@ -10350,18 +11160,14 @@ vpsubw_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // tls(src1) -> spill_src1
@@ -10370,8 +11176,6 @@ vpsubw_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         // vpsubw spill_src1 src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsubw(dcontext, op_spill_dst, op_spill_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_src1) -> spill_src1
@@ -10390,18 +11194,14 @@ vpsubw_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src2_reg = YMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT1;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src2 -> tls(spill_src2)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // tls(src2) -> spill_src2
@@ -10410,8 +11210,6 @@ vpsubw_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         // vpsubw src1 spill_src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsubw(dcontext, op_spill_dst, op_src1, op_spill_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_src2) -> spill_src2
@@ -10573,607 +11371,6 @@ instr_t *
 vpsubw_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
                        reg_id_t dst_reg, reg_id_t mask_reg)
 {
-
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    reg_id_t src1_reg_lower = DR_REG_NULL;
-    reg_id_t src1_reg_upper = DR_REG_NULL;
-    reg_id_t src2_reg_lower = DR_REG_NULL;
-    reg_id_t src2_reg_upper = DR_REG_NULL;
-    reg_id_t dst_reg_lower = DR_REG_NULL;
-    reg_id_t dst_reg_upper = DR_REG_NULL;
-
-    const uint src1_need_spill = NEED_SPILL_ZMM(src1_reg) ? 1 : 0;
-    const uint src2_need_spill = NEED_SPILL_ZMM(src2_reg) ? 2 : 0;
-    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 4 : 0;
-    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
-
-    switch (need_spill) {
-    case 0: { /* no spill */
-        if (src1_reg == dst_reg) {
-            src1_reg_lower = ZMM_TO_YMM(src1_reg);
-            src2_reg_lower = ZMM_TO_YMM(src2_reg);
-            dst_reg_lower = src1_reg_lower;
-            src1_reg_upper = find_available_spill_ymm_avoiding_variadic(2, src1_reg_lower, src2_reg_lower);
-            src2_reg_upper =
-                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, src1_reg_upper);
-            dst_reg_upper = src1_reg_upper;
-
-            // save src1-up -> tls(src1-up)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-            // save src2-up -> tls(src2-up)
-            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-
-            // tls(src1-up) -> src1-up
-            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(
-                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-            // tls(src2-up) -> src2-up
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
-                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-            // vpsubw
-            instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_lower),
-                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
-            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-            // dst-low -> tls(dst-low)
-            instr_t *i7 =
-                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-            // dst-up -> tls(dst-up)
-            instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-            // restore src1-up from tls(src1-up)
-            instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-            // restore src2-up from tls(src2-up)
-            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
-#endif
-            instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
-            return i1;
-        } else {
-            src1_reg_lower = ZMM_TO_YMM(src1_reg);
-            src2_reg_lower = ZMM_TO_YMM(src2_reg);
-            dst_reg_lower = ZMM_TO_YMM(dst_reg);
-            src1_reg_upper =
-                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-            src2_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
-                                                                        dst_reg_lower, src1_reg_upper);
-            dst_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                       src1_reg_upper, src2_reg_upper);
-
-            // save src1-up -> tls(src1-up)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-            // save src2-up -> tls(src2-up)
-            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-            // save dst-up -> tls(dst-up)
-            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-            // tls(src1-up) -> src1-up
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
-                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-            // tls(src2-up) -> src2-up
-            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(
-                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-            // vpsubw
-            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_lower),
-                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
-            instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-            // dst-low -> tls(dst-low)
-            instr_t *i8 =
-                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-            // dst-up -> tls(dst-up)
-            instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-            // restore src1-up from tls(src1-up)
-            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-            // restore src2-up from tls(src2-up)
-            instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-            // restore dst-up from tls(dst-up)
-            instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
-#endif
-            instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
-            return i1;
-        }
-    } break;
-    case 1: { /* src1 need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - src1 needs special handling
-        reg_id_t spill_src1_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower, src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_src1_lower, src1_reg_upper, src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i4 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load src1 lower and upper parts to spill registers
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_16);
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Load src2 upper part
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_lower),
-                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
-        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results
-        instr_t *i10 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
-#endif
-        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
-        return i1;
-    } break;
-    case 2: { /* src2 need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - src2 needs special handling
-        reg_id_t spill_src2_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src2_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src2_lower, src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_src2_lower, src1_reg_upper, src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i4 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load src1 upper part
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Load src2 lower and upper parts to spill registers
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_16);
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_lower),
-                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
-        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results
-        instr_t *i10 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
-#endif
-        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
-        return i1;
-    } break;
-    case 3: { /* both src1 and src2 need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - both src1 and src2 need special handling
-        reg_id_t spill_src1_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
-                                                                               dst_reg_lower, spill_src1_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower, spill_src2_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower, spill_src2_lower, src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_src1_lower, spill_src2_lower, src1_reg_upper,
-                                                                   src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load src1 lower and upper parts to spill registers
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_16);
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Load src2 lower and upper parts to spill registers
-        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_16);
-        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_lower),
-                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
-        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results
-        instr_t *i12 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
-                                     i16, i17, i18);
-#endif
-        instrlist_concat_next_instr(ilist, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
-                                    i17, i18);
-        return i1;
-    } break;
-    case 4: { /* dst need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - dst needs special handling
-        reg_id_t spill_dst_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_dst_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_dst_lower, src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_dst_lower, src1_reg_upper, src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i4 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load upper parts of source registers
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(spill_dst_lower),
-                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
-        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results to dst TLS slots
-        instr_t *i9 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
-#endif
-        instrlist_concat_next_instr(ilist, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
-        return i1;
-    } break;
-    case 5: { /* both src1 and dst need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - both src1 and dst need special handling
-        reg_id_t spill_src1_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
-                                                                              dst_reg_lower, spill_src1_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower, spill_dst_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower, spill_dst_lower, src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_src1_lower, spill_dst_lower, src1_reg_upper,
-                                                                   src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load src1 lower and upper parts to spill registers
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_16);
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Load src2 upper part
-        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(spill_dst_lower),
-                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
-        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results to dst TLS slots
-        instr_t *i11 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
-                                     i16, i17);
-#endif
-        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
-                                    i17);
-        return i1;
-    } break;
-    case 6: { /* both src2 and dst need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - both src2 and dst need special handling
-        reg_id_t spill_src2_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
-                                                                              dst_reg_lower, spill_src2_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src2_lower, spill_dst_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src2_lower, spill_dst_lower, src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_src2_lower, spill_dst_lower, src1_reg_upper,
-                                                                   src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load src1 upper part
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Load src2 lower and upper parts to spill registers
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_16);
-        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(spill_dst_lower),
-                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
-        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results to dst TLS slots
-        instr_t *i11 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
-                                     i16, i17);
-#endif
-        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
-                                    i17);
-        return i1;
-    } break;
-    case 7: { /* all src1, src2 and dst need spill */
-        src1_reg_lower = ZMM_TO_YMM(src1_reg);
-        src2_reg_lower = ZMM_TO_YMM(src2_reg);
-        dst_reg_lower = ZMM_TO_YMM(dst_reg);
-
-        // Find spill registers - all registers need special handling
-        reg_id_t spill_src1_lower =
-            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
-        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
-                                                                               dst_reg_lower, spill_src1_lower);
-        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(
-            5, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower);
-        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(
-            6, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower, spill_dst_lower);
-        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                    spill_src1_lower, spill_src2_lower, spill_dst_lower,
-                                                                    src1_reg_upper);
-        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(8, src1_reg_lower, src2_reg_lower, dst_reg_lower,
-                                                                   spill_src1_lower, spill_src2_lower, spill_dst_lower,
-                                                                   src1_reg_upper, src2_reg_upper);
-
-        // Save spill registers
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i6 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-        // Load src1 lower and upper parts to spill registers
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_16);
-        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Load src2 lower and upper parts to spill registers
-        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_16);
-        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Perform operations
-        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(spill_dst_lower),
-                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
-        instr_t *i12 = instr_create_1dst_2src(dcontext, OP_vpsubw, opnd_create_reg(dst_reg_upper),
-                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
-
-        // Store results to dst TLS slots
-        instr_t *i13 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
-
-        // Restore spill registers
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_16);
-        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_16);
-        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_16);
-        instr_t *i19 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_16);
-        instr_t *i20 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_16);
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
-                                     i16, i17, i18, i19, i20);
-#endif
-        instrlist_concat_next_instr(ilist, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
-                                    i17, i18, i19, i20);
-        return i1;
-    } break;
-    }
     return NULL_INSTR;
 }
 
@@ -11624,11 +11821,9 @@ vpsubd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
         reg_id_t spill_src2_reg = YMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
@@ -11659,22 +11854,16 @@ vpsubd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
     case 4: { /* dst need spill */
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
 
-
         // spill_dst -> tls(spill_dst)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // vpsubd src1 src2 -> spill_dst
         instr_t *i2 = INSTR_CREATE_vpsubd(dcontext, op_spill_dst, op_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_dst) -> spill_dst
@@ -11690,18 +11879,14 @@ vpsubd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT1;
 
-
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
         opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src1 -> tls(spill_src1)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // tls(src1) -> spill_src1
@@ -11710,8 +11895,6 @@ vpsubd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         // vpsubd spill_src1 src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsubd(dcontext, op_spill_dst, op_spill_src1, op_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_src1) -> spill_src1
@@ -11730,18 +11913,14 @@ vpsubd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         reg_id_t spill_src2_reg = YMM_SPILL_SLOT0;
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT1;
 
-
         opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
-
 
         // spill_src2 -> tls(spill_src2)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
         // spill_dst -> tls(spill_dst)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
         // tls(src2) -> spill_src2
@@ -11750,8 +11929,6 @@ vpsubd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         // vpsubd src1 spill_src2 -> spill_dst
         instr_t *i4 = INSTR_CREATE_vpsubd(dcontext, op_spill_dst, op_src1, op_spill_src2);
         // spill_dst -> tls(dst)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
         // tls(spill_src2) -> spill_src2
@@ -11913,6 +12090,104 @@ instr_t *
 vpsubd_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
                        reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src1_reg_lower = DR_REG_NULL;
+    reg_id_t src1_reg_upper = DR_REG_NULL;
+    reg_id_t src2_reg_lower = DR_REG_NULL;
+    reg_id_t src2_reg_upper = DR_REG_NULL;
+    reg_id_t dst_reg_lower = DR_REG_NULL;
+    reg_id_t dst_reg_upper = DR_REG_NULL;
+
+    const uint src1_need_spill = NEED_SPILL_ZMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_ZMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { /* no spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        opnd_t op_src1_lower = opnd_create_reg(src1_reg_lower);
+        opnd_t op_src2_lower = opnd_create_reg(src2_reg_lower);
+        opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
+
+        // src1 upper, src2 upper, dst upper from spill pool
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   src1_reg_upper, src2_reg_upper);
+
+        opnd_t op_src1_upper = opnd_create_reg(src1_reg_upper);
+        opnd_t op_src2_upper = opnd_create_reg(src2_reg_upper);
+        opnd_t op_dst_upper = opnd_create_reg(dst_reg_upper);
+
+        /// save src1-up -> tls(src1-up)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        /// save src2-up -> tls(src2-up)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        /// save dst-up -> tls(dst-up)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+        // vpsubd src1-lo - src2-lo -> dst-lo
+        instr_t *i4 = INSTR_CREATE_vpsubd(dcontext, op_dst_lower, op_src1_lower, op_src2_lower);
+        // tls(src1 high) -> src1-up
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src2 high) -> src2-up
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vpsubd src1-up - src2-up -> dst-up
+        instr_t *i7 = INSTR_CREATE_vpsubd(dcontext, op_dst_upper, op_src1_upper, op_src2_upper);
+        // dst-lo -> tls(dst low 256)
+        instr_t *i8 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // dst-up -> tls(dst high 256)
+        instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        /// restore src1-up -> src1-up
+        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        /// restore src2-up -> src2-up
+        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        /// restore dst-up -> dst-up
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+#endif
+        instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+        return i1;
+    } break;
+    case 1: { // src1 need spill
+
+    } break;
+    case 2: { // src2 need spill
+
+    } break;
+    case 3: { // src1 and src2 need spill
+
+    } break;
+    case 4: { // dst need spill
+
+    } break;
+    case 5: { // src1 and dst need spill
+
+    } break;
+    case 6: { // src2 and dst need spill
+
+    } break;
+    case 7: { // src1, src2 and dst need spill
+
+    } break;
+    }
     return NULL_INSTR;
 }
 
@@ -11941,6 +12216,1325 @@ rw_func_vpsubd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
 }
 
 /* ==============================================
+ *         Helper func for vpsubq
+ * ============================================= */
+
+instr_t *
+vpsubq_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
+                       reg_id_t dst_reg, reg_id_t mask_reg)
+{
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    const uint src1_need_spill_flag = NEED_SPILL_XMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill_flag = NEED_SPILL_XMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_XMM(dst_reg) ? 4 : 0;
+    const uint need_spill_flag = src1_need_spill_flag | src2_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { /* no spill */
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        instr_t *i1 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_src1, op_src2);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    } break;
+    case 1: { /* src1 need spill */
+        // vpsubd {%k0} %xmm23 %xmm13 -> %xmm13
+        reg_id_t spill_src1_reg = DR_REG_NULL;
+        if (src2_reg == dst_reg) {
+            spill_src1_reg = find_one_available_spill_xmm(src2_reg);
+        } else {
+            spill_src1_reg = find_available_spill_xmm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+        }
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        // spill_src1_reg -> tls(spill_src1_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+        // tls(src1_reg) -> spill_src1_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // vpsubq spill_src1_reg src2_reg -> dst_reg
+        instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_spill_src1, op_src2);
+        // tls(spill_src1_reg) -> spill_src1_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        // vpsubd {%k0} %xmm11 %xmm23 -> %xmm11
+        reg_id_t spill_src2_reg = DR_REG_NULL;
+        if (src1_reg == dst_reg) {
+            spill_src2_reg = find_one_available_spill_xmm(src2_reg);
+        } else {
+            spill_src2_reg = find_available_spill_xmm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
+        }
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        // spill_src2_reg -> tls(spill_src2_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+        // tls(src2_reg) -> spill_src2_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpsubq src1_reg spill_src2_reg -> dst_reg
+        instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_src1, op_spill_src2);
+        // tls(spill_src2_reg) -> spill_src2_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 3: { /* both src need spill */
+        reg_id_t spill_src1 = find_one_available_spill_xmm(dst_reg);
+        reg_id_t spill_src2 = find_available_spill_xmm_avoiding(spill_src1, dst_reg, DR_REG_NULL);
+
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1);
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+        // spill_src2 -> tls(spill_src2)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2)), OPSZ_16);
+        // tls(src1) -> spill_src1
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // tls(src2) -> spill_srrc2
+        instr_t *i4 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpsubq spill_src1 spill_src2 -> dst
+        instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_spill_src1, op_spill_src2);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i6 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+        // tls(spill_src2) -> spill_src2
+        instr_t *i7 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        // vpsubq {%k0} %xmm5 %xmm0 -> %xmm22
+        reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_reg, src2_reg, DR_REG_NULL);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+
+        // spill_dst -> tls(spill_dst)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+        // vpsubq src1 src2 -> spill_dst
+        instr_t *i2 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_src1, op_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_dst) -> spill_dst
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 5: { /* src1 and dst need spill */
+        // vpsubq {%k0} %xmm22 %xmm1 -> %xmm22
+        reg_id_t spill_src1 = find_one_available_spill_xmm(src2_reg);
+        reg_id_t spill_dst = spill_src1;
+
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+        // tls(src1) -> spill_src1
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // vpsubq spill_src1 src2 -> spill_src1
+        instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 6: { /* src2 and dst need spill */
+        // vpsubq {%k0} %xmm1 %xmm22 -> %xmm22
+        reg_id_t spill_src2 = find_one_available_spill_xmm(src1_reg);
+        reg_id_t spill_dst = spill_src2;
+
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2)), OPSZ_16);
+        // tls(src1) -> spill_src1
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpsubq spill_src1 src2 -> spill_src1
+        instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_src1, op_spill_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 7: { /* all need spill */
+        if (src1_reg == dst_reg && src2_reg == dst_reg) {
+            reg_id_t spill_reg = XMM_SPILL_SLOT0;
+            opnd_t op_spill = opnd_create_reg(spill_reg);
+            // spill -> tls_slot(spill)
+            instr_t *i1 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
+            // tls(src1) -> spill
+            instr_t *i2 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // vpsubq spill spill -> spill
+            instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_spill, op_spill, op_spill);
+            // spill -> tls(dst)
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill) -> spill
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        } else if (src1_reg == dst_reg) {
+            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src1_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+            // vpsubq spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        } else if (src2_reg == dst_reg) {
+            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src2_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+            // vpsubq spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        } else {
+            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src1_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+            // vpsubq spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        }
+    } break;
+    default: {
+        REWRITE_INFO(STD_OUTF, "vpsubq xmm and xmm pattern not support\n");
+    } break;
+    }
+    return NULL_INSTR;
+}
+
+instr_t *
+vpsubq_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
+                       reg_id_t dst_reg, reg_id_t mask_reg)
+{
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    const uint src1_need_spill_flag = NEED_SPILL_YMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill_flag = NEED_SPILL_YMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_YMM(dst_reg) ? 4 : 0;
+    const uint need_spill_flag = src1_need_spill_flag | src2_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { /* no spill */
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        instr_t *i1 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_src1, op_src2);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    } break;
+    case 1: { /* src1 need spill */
+        // vpsubq {%k0} %ymm23 %ymm13 -> %ymm13
+        reg_id_t spill_src1_reg = DR_REG_NULL;
+        if (src2_reg == dst_reg) {
+            spill_src1_reg = find_one_available_spill_ymm(src2_reg);
+        } else {
+            spill_src1_reg = find_available_spill_ymm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+        }
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        // spill_src1_reg -> tls(spill_src1_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // tls(src1_reg) -> spill_src1_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        // vpsubq spill_src1_reg src2_reg -> dst_reg
+        instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_spill_src1, op_src2);
+        // tls(spill_src1_reg) -> spill_src1_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        // vpsubq {%k0} %ymm11 %ymm23 -> %ymm11
+        reg_id_t spill_src2_reg = DR_REG_NULL;
+        if (src1_reg == dst_reg) {
+            spill_src2_reg = find_one_available_spill_ymm(src2_reg);
+        } else {
+            spill_src2_reg = find_available_spill_ymm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
+        }
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        // spill_src2_reg -> tls(spill_src2_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+        // tls(src2_reg) -> spill_src2_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+        // vpsubq src1_reg spill_src2_reg -> dst_reg
+        instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_src1, op_spill_src2);
+        // tls(spill_src2_reg) -> spill_src2_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 3: { /* both src need spill */
+        reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
+        reg_id_t spill_src2_reg = YMM_SPILL_SLOT1;
+
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // spill_src2 -> tls(spill_src2)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+        // tls(src1) -> spill_src1
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        // tls(src2) -> spill_src2
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+        // vpsubq spill_src1 spill_src2 -> dst
+        instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_dst, op_spill_src1, op_spill_src2);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // tls(spill_src2) -> spill_src2
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+        // spill_dst -> tls(spill_dst)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        // vpsubq src1 src2 -> spill_dst
+        instr_t *i2 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_src1, op_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(spill_dst) -> spill_dst
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 5: { /* src1 and dst need spill */
+        reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
+        reg_id_t spill_dst_reg = YMM_SPILL_SLOT1;
+
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // spill_dst -> tls(spill_dst)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        // tls(src1) -> spill_src1
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        // vpsubq spill_src1 src2 -> spill_dst
+        instr_t *i4 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // tls(spill_dst) -> spill_dst
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 6: { /* src2 and dst need spill */
+        reg_id_t spill_src2_reg = YMM_SPILL_SLOT0;
+        reg_id_t spill_dst_reg = YMM_SPILL_SLOT1;
+
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+        // spill_src2 -> tls(spill_src2)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+        // spill_dst -> tls(spill_dst)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        // tls(src2) -> spill_src2
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+        // vpsubq src1 spill_src2 -> spill_dst
+        instr_t *i4 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_src1, op_spill_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(spill_src2) -> spill_src2
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+        // tls(spill_dst) -> spill_dst
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 7: { /* all need spill */
+        if (src1_reg == dst_reg && src2_reg == dst_reg) {
+            reg_id_t spill_reg = YMM_SPILL_SLOT0;
+            opnd_t op_spill = opnd_create_reg(spill_reg);
+            // spill -> tls_slot(spill)
+            instr_t *i1 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_reg)), OPSZ_32);
+            // tls(src1) -> spill
+            instr_t *i2 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+            // vpsubq spill spill -> spill
+            instr_t *i3 = INSTR_CREATE_vpsubq(dcontext, op_spill, op_spill, op_spill);
+            // spill -> tls(dst)
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // tls(spill) -> spill
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        } else if (src1_reg == dst_reg) {
+            reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = YMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src1_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+            // vpsubq spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        } else if (src2_reg == dst_reg) {
+            reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = YMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src2_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+            // vpsubq spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        } else {
+            reg_id_t spill_src1_reg = YMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = YMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src1_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+            // vpsubq spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpsubq(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        }
+    } break;
+    default: {
+        REWRITE_INFO(STD_OUTF, "vpsubq ymm and ymm pattern not support\n");
+    } break;
+    }
+    return NULL_INSTR;
+}
+
+instr_t *
+vpsubq_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
+                       reg_id_t dst_reg, reg_id_t mask_reg)
+{
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src1_reg_lower = DR_REG_NULL;
+    reg_id_t src1_reg_upper = DR_REG_NULL;
+    reg_id_t src2_reg_lower = DR_REG_NULL;
+    reg_id_t src2_reg_upper = DR_REG_NULL;
+    reg_id_t dst_reg_lower = DR_REG_NULL;
+    reg_id_t dst_reg_upper = DR_REG_NULL;
+
+    const uint src1_need_spill = NEED_SPILL_ZMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_ZMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { /* no spill */
+        if (src1_reg == dst_reg) {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = src1_reg_lower;
+            src1_reg_upper = find_available_spill_ymm_avoiding_variadic(2, src1_reg_lower, src2_reg_lower);
+            src2_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, src1_reg_upper);
+            dst_reg_upper = src1_reg_upper;
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vpsubq
+            instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i7 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+#endif
+            instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+            return i1;
+        } else {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            src1_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+            src2_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                        dst_reg_lower, src1_reg_upper);
+            dst_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                       src1_reg_upper, src2_reg_upper);
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // save dst-up -> tls(dst-up)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vpsubq
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i8 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // restore dst-up from tls(dst-up)
+            instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+#endif
+            instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+            return i1;
+        }
+    } break;
+    case 1: { /* src1 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src1 needs special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src2 needs special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 3: { /* both src1 and src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and src2 need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i12 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18);
+#endif
+        instrlist_concat_next_instr(ilist, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - dst needs special handling
+        reg_id_t spill_dst_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_dst_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load upper parts of source registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i9 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+#endif
+        instrlist_concat_next_instr(ilist, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+        return i1;
+    } break;
+    case 5: { /* both src1 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and dst need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 6: { /* both src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src2 and dst need special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 7: { /* all src1, src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - all registers need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(
+            5, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(
+            6, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                    src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(8, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                   src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i6 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(spill_dst_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i12 = instr_create_1dst_2src(dcontext, OP_vpsubq, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i13 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i19 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i20 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18, i19, i20);
+#endif
+        instrlist_concat_next_instr(ilist, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18, i19, i20);
+        return i1;
+    } break;
+    }
+    return NULL_INSTR;
+}
+
+instr_t * /* 150 */
+rw_func_vpsubq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+    opnd_t mask_opnd = instr_get_src(instr, 0);
+    opnd_t src_opnd1 = instr_get_src(instr, 1); // %xyzmm{i}
+    opnd_t src_opnd2 = instr_get_src(instr, 2); // %xyzmm{j}
+    opnd_t dst_opnd = instr_get_dst(instr, 0);  // %xyzmm{k}
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "vpsubq", true, true, true, true);
+#endif
+    reg_id_t mask_reg = opnd_get_reg(mask_opnd);
+    reg_id_t src1_reg = opnd_get_reg(src_opnd1);
+    reg_id_t src2_reg = opnd_get_reg(src_opnd2);
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
+    if (IS_YMM_REG(dst_reg))
+        return vpsubq_ymm_and_ymm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
+    if (IS_XMM_REG(dst_reg))
+        return vpsubq_xmm_and_xmm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
+    if (IS_ZMM_REG(dst_reg))
+        return vpsubq_zmm_and_zmm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
+    REWRITE_INFO(STD_OUTF, "vpsubd pattern not support\n");
+    return NULL_INSTR;
+}
+
+/* ==============================================
  *         Helper func for vpaddw
  * ============================================= */
 
@@ -11948,6 +13542,335 @@ instr_t *
 vpaddw_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
                        reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    const uint src1_need_spill_flag = NEED_SPILL_XMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill_flag = NEED_SPILL_XMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_XMM(dst_reg) ? 4 : 0;
+    const uint need_spill_flag = src1_need_spill_flag | src2_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { /* no spill */
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        instr_t *i1 = INSTR_CREATE_vpaddw(dcontext, op_dst, op_src1, op_src2);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    } break;
+    case 1: { /* src1 need spill */
+        // vpaddd {%k0} %xmm23 %xmm13 -> %xmm13
+        reg_id_t spill_src1_reg = DR_REG_NULL;
+        if (src2_reg == dst_reg) {
+            spill_src1_reg = find_one_available_spill_xmm(src2_reg);
+        } else {
+            spill_src1_reg = find_available_spill_xmm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+        }
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        // spill_src1_reg -> tls(spill_src1_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+        // tls(src1_reg) -> spill_src1_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // vpaddw spill_src1_reg src2_reg -> dst_reg
+        instr_t *i3 = INSTR_CREATE_vpaddw(dcontext, op_dst, op_spill_src1, op_src2);
+        // tls(spill_src1_reg) -> spill_src1_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        // vpaddd {%k0} %xmm11 %xmm23 -> %xmm11
+        reg_id_t spill_src2_reg = DR_REG_NULL;
+        if (src1_reg == dst_reg) {
+            spill_src2_reg = find_one_available_spill_xmm(src2_reg);
+        } else {
+            spill_src2_reg = find_available_spill_xmm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
+        }
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+        // spill_src2_reg -> tls(spill_src2_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+        // tls(src2_reg) -> spill_src2_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpaddw src1_reg spill_src2_reg -> dst_reg
+        instr_t *i3 = INSTR_CREATE_vpaddw(dcontext, op_dst, op_src1, op_spill_src2);
+        // tls(spill_src2_reg) -> spill_src2_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 3: { /* both src need spill */
+        reg_id_t spill_src1 = find_one_available_spill_xmm(dst_reg);
+        reg_id_t spill_src2 = find_available_spill_xmm_avoiding(spill_src1, dst_reg, DR_REG_NULL);
+
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1);
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2);
+        opnd_t op_dst = opnd_create_reg(dst_reg);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+        // spill_src2 -> tls(spill_src2)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2)), OPSZ_16);
+        // tls(src1) -> spill_src1
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // tls(src2) -> spill_srrc2
+        instr_t *i4 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpaddw spill_src1 spill_src2 -> dst
+        instr_t *i5 = INSTR_CREATE_vpaddw(dcontext, op_dst, op_spill_src1, op_spill_src2);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i6 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+        // tls(spill_src2) -> spill_src2
+        instr_t *i7 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        // vpaddw {%k0} %xmm5 %xmm0 -> %xmm22
+        reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_reg, src2_reg, DR_REG_NULL);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+
+        // spill_dst -> tls(spill_dst)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+        // vpadd src1 src2 -> spill_dst
+        instr_t *i2 = INSTR_CREATE_vpaddw(dcontext, op_spill_dst, op_src1, op_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_dst) -> spill_dst
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 5: { /* src1 and dst need spill */
+        // vpaddw {%k0} %xmm22 %xmm1 -> %xmm22
+        reg_id_t spill_src1 = find_one_available_spill_xmm(src2_reg);
+        reg_id_t spill_dst = spill_src1;
+
+        opnd_t op_spill_src1 = opnd_create_reg(spill_src1);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+        // tls(src1) -> spill_src1
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // vpaddw spill_src1 src2 -> spill_src1
+        instr_t *i3 = INSTR_CREATE_vpaddw(dcontext, op_spill_dst, op_spill_src1, op_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 6: { /* src2 and dst need spill */
+        // vpaddw {%k0} %xmm1 %xmm22 -> %xmm22
+        reg_id_t spill_src2 = find_one_available_spill_xmm(src1_reg);
+        reg_id_t spill_dst = spill_src2;
+
+        opnd_t op_spill_src2 = opnd_create_reg(spill_src2);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
+        opnd_t op_spill_dst = opnd_create_reg(spill_dst);
+
+        // spill_src1 -> tls(spill_src1)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2)), OPSZ_16);
+        // tls(src1) -> spill_src1
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpaddw spill_src1 src2 -> spill_src1
+        instr_t *i3 = INSTR_CREATE_vpaddw(dcontext, op_spill_dst, op_src1, op_spill_src2);
+        // spill_dst -> tls(dst)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_src1) -> spill_src1
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 7: { /* all need spill */
+        if (src1_reg == dst_reg && src2_reg == dst_reg) {
+            reg_id_t spill_reg = XMM_SPILL_SLOT0;
+            opnd_t op_spill = opnd_create_reg(spill_reg);
+            // spill -> tls_slot(spill)
+            instr_t *i1 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
+            // tls(src1) -> spill
+            instr_t *i2 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // vpaddw spill spill -> spill
+            instr_t *i3 = INSTR_CREATE_vpaddw(dcontext, op_spill, op_spill, op_spill);
+            // spill -> tls(dst)
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill) -> spill
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        } else if (src1_reg == dst_reg) {
+            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src1_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+            // vpaddw spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpaddw(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        } else if (src2_reg == dst_reg) {
+            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src2_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+            // vpaddw spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpaddw(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        } else {
+            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
+            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
+            reg_id_t spill_dst_reg = spill_src1_reg;
+
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(src1) -> spill_src1
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+            // vpaddw spill_src1 spill_src2 -> spill_dst
+            instr_t *i5 = INSTR_CREATE_vpaddw(dcontext, op_spill_dst, op_spill_src1, op_spill_src2);
+            // spill_dst -> tls(dst)
+            instr_t *i6 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+            instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+            return i1;
+        }
+    } break;
+    default: {
+        REWRITE_INFO(STD_OUTF, "vpaddd xmm and xmm pattern not support\n");
+    } break;
+    }
     return NULL_INSTR;
 }
 
@@ -12683,7 +14606,7 @@ vpaddd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         return i1;
     } break;
     case 3: { /* both src need spill */
-        // Both src1 and src2 need spill, dst doesn't
+        // vpaddd {%k0} %ymm23 %ymm24 -> %ymm13
         reg_id_t spill_src1_reg = find_available_spill_ymm_avoiding(dst_reg, DR_REG_NULL, DR_REG_NULL);
         reg_id_t spill_src2_reg = find_available_spill_ymm_avoiding(dst_reg, spill_src1_reg, DR_REG_NULL);
 
@@ -12691,27 +14614,26 @@ vpaddd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_dst = opnd_create_reg(dst_reg);
 
-        // Save spill registers to TLS
+        // spill_src1_reg -> tls(spill_src1_reg)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // spill_src2_reg -> tls(spill_src2_reg)
         instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
-
-        // Load src1 and src2 from TLS to spill registers
+        // tls(src1_reg) -> spill_src1_reg
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        // tls(src2_reg) -> spill_src2_reg
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
-
-        // Perform the operation
+        // vpaddd spill_src1_reg spill_src2_reg -> dst_reg
         instr_t *i5 = INSTR_CREATE_vpaddd(dcontext, op_dst, op_spill_src1, op_spill_src2);
-
-        // Restore spill registers from TLS
+        // tls(spill_src1_reg) -> spill_src1_reg
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // tls(spill_src2_reg) -> spill_src2_reg
         instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
-
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -12743,37 +14665,34 @@ vpaddd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         return i1;
     } break;
     case 5: { /* src1 and dst need spill */
-        // Both src1 and dst need spill, src2 doesn't
+        // vpaddd {%k0} %ymm23 %ymm13 -> %ymm22
         reg_id_t spill_src1_reg = find_available_spill_ymm_avoiding(src2_reg, DR_REG_NULL, DR_REG_NULL);
         reg_id_t spill_dst_reg = find_available_spill_ymm_avoiding(src2_reg, spill_src1_reg, DR_REG_NULL);
 
         opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
-        opnd_t op_src2 = opnd_create_reg(src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+        opnd_t op_src2 = opnd_create_reg(src2_reg);
 
-        // Save spill registers to TLS
+        // spill_src1_reg -> tls(spill_src1_reg)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // spill_dst_reg -> tls(spill_dst_reg)
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-
-        // Load src1 from TLS to spill register
+        // tls(src1_reg) -> spill_src1_reg
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
-
-        // Perform the operation
+        // vpaddd spill_src1_reg src2_reg -> spill_dst_reg
         instr_t *i4 = INSTR_CREATE_vpaddd(dcontext, op_spill_dst, op_spill_src1, op_src2);
-
-        // Store dst result to TLS
+        // spill_dst_reg -> tls(dst_reg)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
-
-        // Restore spill registers from TLS
+        // tls(spill_src1_reg) -> spill_src1_reg
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -12781,37 +14700,34 @@ vpaddd_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
         return i1;
     } break;
     case 6: { /* src2 and dst need spill */
-        // Both src2 and dst need spill, src1 doesn't
+        // vpaddd {%k0} %ymm13 %ymm23 -> %ymm22
         reg_id_t spill_src2_reg = find_available_spill_ymm_avoiding(src1_reg, DR_REG_NULL, DR_REG_NULL);
         reg_id_t spill_dst_reg = find_available_spill_ymm_avoiding(src1_reg, spill_src2_reg, DR_REG_NULL);
 
-        opnd_t op_src1 = opnd_create_reg(src1_reg);
         opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
         opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+        opnd_t op_src1 = opnd_create_reg(src1_reg);
 
-        // Save spill registers to TLS
+        // spill_src2_reg -> tls(spill_src2_reg)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+        // spill_dst_reg -> tls(spill_dst_reg)
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-
-        // Load src2 from TLS to spill register
+        // tls(src2_reg) -> spill_src2_reg
         instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
-
-        // Perform the operation
+        // vpaddd src1_reg spill_src2_reg -> spill_dst_reg
         instr_t *i4 = INSTR_CREATE_vpaddd(dcontext, op_spill_dst, op_src1, op_spill_src2);
-
-        // Store dst result to TLS
+        // spill_dst_reg -> tls(dst_reg)
         instr_t *i5 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
-
-        // Restore spill registers from TLS
+        // tls(spill_src2_reg) -> spill_src2_reg
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_reg)), OPSZ_32);
+        // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -13567,7 +15483,6 @@ vpaddd_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
     } break;
     }
     return NULL_INSTR;
-    return NULL_INSTR;
 }
 
 /**
@@ -13615,7 +15530,6 @@ instr_t *
 vpmovsxwd_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
-
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -13707,6 +15621,7 @@ instr_t *
 vpmovsxwd_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -13846,6 +15761,7 @@ vpmovsxdq_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *ins
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
+    // FIXME: remain mask reg not take into account
     const uint src_need_spill_flag = NEED_SPILL_YMM(src_reg) ? 1 : 0;
     const uint dst_need_spill_flag = NEED_SPILL_YMM(dst_reg) ? 2 : 0;
     const uint need_spill_flag = src_need_spill_flag | dst_need_spill_flag;
@@ -14047,6 +15963,7 @@ rw_func_vpmovsxdq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
             return vpmovsxdq_zmm_reg2reg_gen(dcontext, ilist, instr, src_reg, dst_reg, mask_reg);
     }
     case BASE_DISP_kind: {
+        // TODO:
     } break;
     default: REWRITE_INFO(STD_OUTF, "vpmovsxdq pattern not support");
     }
@@ -14321,6 +16238,7 @@ instr_t *
 vpmovzxwd_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
     opnd_t src_opnd = create_mapping_ymm_opnd(dcontext, src_reg);
     opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
     instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpmovzxwd, dst_opnd, src_opnd);
@@ -14336,6 +16254,7 @@ instr_t *
 vpmovzxwd_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
     const uint src_need_spill_flag = NEED_SPILL_XMM(src_reg) ? 1 : 0;
     const uint dst_need_spill_flag = NEED_SPILL_XMM(dst_reg) ? 2 : 0;
     const uint need_spill_flag = src_need_spill_flag | dst_need_spill_flag;
@@ -14487,6 +16406,7 @@ instr_t *
 vpmovzxdq_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -14584,6 +16504,7 @@ instr_t *
 vpmovzxdq_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
 
     const uint src_need_spill_flag = NEED_SPILL_XMM(src_reg) ? 1 : 0;
     const uint dst_need_spill_flag = NEED_SPILL_XMM(dst_reg) ? 2 : 0;
@@ -14706,6 +16627,328 @@ rw_func_vpmovzxdq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_
     } break;
     default: REWRITE_INFO(STD_OUTF, "vpmovzxdq pattern not support");
     }
+    return NULL_INSTR;
+}
+
+/* ==============================================
+ *    Helper func for vpmulld
+ * ============================================= */
+
+instr_t *
+vpmulld_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
+                        reg_id_t dst_reg, reg_id_t mask_reg)
+{
+#ifdef DEBUG
+    REWRITE_ERROR(STD_ERRF, "vpmulld zmm and zmm not support");
+#endif
+    return NULL_INSTR;
+}
+
+instr_t *
+vpmulld_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
+                        reg_id_t dst_reg, reg_id_t mask_reg)
+{
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    const uint src1_need_spill = NEED_SPILL_YMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_YMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { // no spill
+        opnd_t dst_opnd = opnd_create_reg(dst_reg);
+        opnd_t src_opnd1 = opnd_create_reg(src1_reg);
+        opnd_t src_opnd2 = opnd_create_reg(src2_reg);
+        instr_t *i1 = INSTR_CREATE_vpmulld(dcontext, dst_opnd, src_opnd1, src_opnd2);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    } break;
+    case 1: { // src1 spill
+        reg_id_t spill_src1_reg = find_available_spill_ymm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+        opnd_t spill_src1_opnd = opnd_create_reg(spill_src1_reg);
+        opnd_t dst_opnd = opnd_create_reg(dst_reg);
+        opnd_t src2_opnd = opnd_create_reg(src2_reg);
+
+        // spill_src1_reg -> tls(spill_src1_reg) | spill src1
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+        // tls_slot(src1_reg) -> spill_src1_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        // vpmulld spill_src1_reg, src2_reg, dst_reg
+        instr_t *i3 = INSTR_CREATE_vpmulld(dcontext, dst_opnd, spill_src1_opnd, src2_opnd);
+        // tls(spill_src1_reg) -> spill_src1_reg | restore src1
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 2: { // src2 spill
+        reg_id_t s2 = find_available_spill_ymm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(s2)), OPSZ_32);
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i3 =
+            INSTR_CREATE_vpmulld(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(src1_reg), opnd_create_reg(s2));
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(s2)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 3: { // src1 and src2 spill
+        reg_id_t s1 = find_one_available_spill_ymm(dst_reg);
+        reg_id_t s2 = find_available_spill_ymm_avoiding(dst_reg, s1, DR_REG_NULL);
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, s1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(s1)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(s2)), OPSZ_32);
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i5 =
+            INSTR_CREATE_vpmulld(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(s1), opnd_create_reg(s2));
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(s2)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(s1)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 4: { // dst spill
+        reg_id_t t = find_available_spill_ymm_avoiding(src1_reg, src2_reg, DR_REG_NULL);
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, t, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(t)), OPSZ_32);
+        instr_t *i2 =
+            INSTR_CREATE_vpmulld(dcontext, opnd_create_reg(t), opnd_create_reg(src1_reg), opnd_create_reg(src2_reg));
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, t, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, t, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(t)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 5: { // src1 and dst spill
+        if (src1_reg == dst_reg) {
+            reg_id_t spill_src1_reg = find_available_spill_ymm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+            opnd_t spill_src1_opnd = opnd_create_reg(spill_src1_reg);
+            opnd_t spill_dst_opnd = spill_src1_opnd;
+            opnd_t src2_opnd = opnd_create_reg(src2_reg);
+
+            // spill_src1_reg -> tls(spill_src1_reg) | spill src1
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+            // tls_slot(src1_reg) -> spill_src1_reg | get the input src
+            instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg)), OPSZ_32);
+            // vpmulld spill_src1_reg, src2_reg, spill_src1_reg
+            instr_t *i3 = INSTR_CREATE_vpmulld(dcontext, spill_dst_opnd, spill_src1_opnd, src2_opnd);
+            // spill_src1_reg -> tls(dst_reg) | store the result back to dst_reg
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // tls(spill_src1_reg) -> spill_src1_reg | restore src1
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        } else {
+        }
+    } break;
+    case 6: { // src2 and dst spill
+        return NULL_INSTR;
+    } break;
+    case 7: { // src1, src2 and dst spill
+        return NULL_INSTR;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vpmulld ymm and ymm not support");
+    }
+    return NULL_INSTR;
+}
+
+instr_t *
+vpmulld_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
+                        reg_id_t dst_reg, reg_id_t mask_reg)
+{
+    // AVX: VEX.128.66.0F.WIG DB /r VPAND xmm1, xmm2, xmm3/m128
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    const uint src1_need_spill = NEED_SPILL_XMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_XMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_XMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { // no spill
+        opnd_t dst_opnd = opnd_create_reg(dst_reg);
+        opnd_t src_opnd1 = opnd_create_reg(src1_reg);
+        opnd_t src_opnd2 = opnd_create_reg(src2_reg);
+        instr_t *i1 = INSTR_CREATE_vpmulld(dcontext, dst_opnd, src_opnd1, src_opnd2);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+        return i1;
+    } break;
+    case 1: { // src1 spill
+        reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+        opnd_t spill_src1_opnd = opnd_create_reg(spill_src1_reg);
+        opnd_t dst_opnd = opnd_create_reg(dst_reg);
+        opnd_t src2_opnd = opnd_create_reg(src2_reg);
+
+        // spill_src1_reg -> tls(spill_src1_reg) | spill src1
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+        // tls_slot(src1_reg) -> spill_src1_reg
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // vpandd spill_src1_reg, src2_reg, dst_reg
+        instr_t *i3 = INSTR_CREATE_vpmulld(dcontext, dst_opnd, spill_src1_opnd, src2_opnd);
+        // tls(spill_src1_reg) -> spill_src1_reg | restore src1
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 2: { // src2 spill
+        reg_id_t s2 = find_available_spill_xmm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(s2)), OPSZ_16);
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        instr_t *i3 =
+            INSTR_CREATE_vpmulld(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(src1_reg), opnd_create_reg(s2));
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(s2)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 3: { // src1 and src2 spill
+        reg_id_t s1 = find_one_available_spill_xmm(dst_reg);
+        reg_id_t s2 = find_available_spill_xmm_avoiding(dst_reg, s1, DR_REG_NULL);
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, s1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(s1)), OPSZ_16);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(s2)), OPSZ_16);
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        instr_t *i5 =
+            INSTR_CREATE_vpmulld(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(s1), opnd_create_reg(s2));
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s2, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(s2)), OPSZ_16);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, s1, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(s1)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+        instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+        return i1;
+    } break;
+    case 4: { // dst spill
+        reg_id_t t = find_available_spill_xmm_avoiding(src1_reg, src2_reg, DR_REG_NULL);
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, t, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(t)), OPSZ_16);
+        instr_t *i2 =
+            INSTR_CREATE_vpmulld(dcontext, opnd_create_reg(t), opnd_create_reg(src1_reg), opnd_create_reg(src2_reg));
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, t, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, t, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(t)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    case 5: { // src1 and dst spill
+        reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
+        opnd_t spill_src1_opnd = opnd_create_reg(spill_src1_reg);
+        opnd_t spill_dst_opnd = spill_src1_opnd;
+        opnd_t src2_opnd = opnd_create_reg(src2_reg);
+
+        // spill_src1_reg -> tls(spill_src1_reg) | spill src1
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+        // tls_slot(src1_reg) -> spill_src1_reg | get the input src
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
+        // vpmulld spill_src1_reg, src2_reg, spill_src1_reg
+        instr_t *i3 = INSTR_CREATE_vpmulld(dcontext, spill_dst_opnd, spill_src1_opnd, src2_opnd);
+        // spill_src1_reg -> tls(dst_reg) | store the result back to dst_reg
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_src1_reg) -> spill_src1_reg | restore src1
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 6: { // src2 and dst spill
+        reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
+        opnd_t spill_src2_opnd = opnd_create_reg(spill_src2_reg);
+        opnd_t spill_dst_opnd = spill_src2_opnd;
+        opnd_t src1_opnd = opnd_create_reg(src1_reg);
+
+        // spill_src2_reg -> tls(spill_src2_reg) | spill src2
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                             TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+        // tls_slot(src2_reg) -> spill_src2_reg | get the input src
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
+        // vpmulld spill_src2_reg, src1_reg, spill_src2_reg
+        instr_t *i3 = INSTR_CREATE_vpmulld(dcontext, spill_dst_opnd, src1_opnd, spill_src2_opnd);
+        // spill_src2_reg -> tls(dst_reg) | store the result back to dst_reg
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_src2_reg) -> spill_src2_reg | restore src2
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 7: { // src1, src2 and dst spill
+        return NULL_INSTR;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vpmulld ymm and ymm not support");
+    }
+    return NULL_INSTR;
+}
+
+instr_t * /* 211 */
+rw_func_vpmulld(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+    // vpmulld {%k0} %ymm30 %ymm1 -> %ymm2
+    opnd_t mask_opnd = instr_get_src(instr, 0);
+    opnd_t src_opnd1 = instr_get_src(instr, 1);
+    opnd_t src_opnd2 = instr_get_src(instr, 2);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "vpmulld", true, true, true, true);
+#endif
+    reg_id_t mask_reg = opnd_get_reg(mask_opnd);
+    reg_id_t src1_reg = opnd_get_reg(src_opnd1);
+    reg_id_t src2_reg = opnd_get_reg(src_opnd2);
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
+    if (IS_ZMM_REG(dst_reg)) {
+        return vpmulld_zmm_and_zmm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
+    }
+    if (IS_YMM_REG(dst_reg)) {
+        return vpmulld_ymm_and_ymm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
+    }
+    if (IS_XMM_REG(dst_reg)) {
+        return vpmulld_xmm_and_xmm_gen(dcontext, ilist, instr, src1_reg, src2_reg, dst_reg, mask_reg);
+    }
+    REWRITE_ERROR(STD_ERRF, "vpmulld pattern not support");
     return NULL_INSTR;
 }
 
@@ -15211,6 +17454,7 @@ vpgatherqq_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opn
                                                   scratch_ymm_upper_opnd);
 
     // after this instr, ymm mask reg is set conform to the k register value, we can use avx2 vpgatherqq now
+
     instr_t *new_instr20 =
         INSTR_CREATE_vpgatherqq(dcontext, opnd_create_reg(dst1_reg), src1_opnd, scratch_ymm_mask_opnd);
 
@@ -15294,6 +17538,59 @@ instr_t *
 vpbroadcastb_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, opnd_t dst_opnd,
                              reg_id_t src_reg, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+    int ymm_dst_idx = TO_YMM_REG_INDEX(dst_reg);
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+    if (k_idx == 0) {          // no mask
+        if (!dst_need_spill) { // no spill
+            reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
+
+            // vpbroadcastb dst_lower_xmm -> dst_reg_lower
+            instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastb, op_dst_lower, src_opnd);
+            // vmovdqu dst_reg_lower -> tls(dst_lower)
+            instr_t *i2 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // vmovdqu dst_reg_lower -> tls(dst_upper)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 3, i1, i2, i3);
+#endif
+            instrlist_concat_next_instr(ilist, 3, i1, i2, i3);
+            return i1;
+        } else { // need spill
+            reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+            opnd_t op_ymm_spill = opnd_create_reg(spill_dst_reg);
+
+            // spill_dst_reg -> tls(spill_dst_reg)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            // vpbroadcastb src_opnd -> spill_dst_reg
+            instr_t *i2 = INSTR_CREATE_vpbroadcastb(dcontext, op_ymm_spill, src_opnd);
+            // ymm_opnd_spill -> tls(ymm_dst)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(ymm_dst_idx), OPSZ_32);
+            // ymm_opnd_spill -> tls(ymm_dst_upper)
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(ymm_dst_idx) + SIZE_OF_YMM, OPSZ_32);
+            // tls(spill_dst_reg) -> spill_dst_reg
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        }
+    } else {                   // need mask
+        if (!dst_need_spill) { // no spill
+            // TODO: use vpcmpeqb and vpblendvb
+        } else { // need spill
+        }
+    }
     return NULL_INSTR;
 }
 
@@ -15301,6 +17598,53 @@ instr_t *
 vpbroadcastb_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, opnd_t dst_opnd,
                              reg_id_t src_reg, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+    int ymm_dst_idx = TO_YMM_REG_INDEX(dst_reg);
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+    if (k_idx == 0) {          // no mask
+        if (!dst_need_spill) { // no spill
+            opnd_t op_ymm = opnd_create_reg(dst_reg);
+            opnd_t op_ymm_down_mapping = opnd_create_reg(YMM_TO_XMM(dst_reg));
+            // %gpr -> %xmm_opnd
+            instr_t *i1 = INSTR_CREATE_vmovd(dcontext, op_ymm_down_mapping, src_opnd);
+            // %xmm_opnd -> %ymm_opnd
+            instr_t *i2 = INSTR_CREATE_vpbroadcastb(dcontext, op_ymm, op_ymm_down_mapping);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+#endif
+            instrlist_concat_next_instr(ilist, 2, i1, i2);
+            return i1;
+        } else { // need spill
+            reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+            opnd_t op_ymm_spill = opnd_create_reg(spill_dst_reg);
+            opnd_t op_ymm_down_mapping_spill = opnd_create_reg(XMM_SPILL_SLOT0);
+            // spill_dst_reg -> tls(spill_dst_reg)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            // %gpr -> %xmm_opnd
+            instr_t *i2 = INSTR_CREATE_vmovd(dcontext, op_ymm_down_mapping_spill, src_opnd);
+            // %xmm_opnd -> %ymm_opnd
+            instr_t *i3 = INSTR_CREATE_vpbroadcastb(dcontext, op_ymm_spill, op_ymm_down_mapping_spill);
+            // ymm_opnd_spill -> tls(ymm_dst)
+            instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(ymm_dst_idx), OPSZ_32);
+            // tls(spill_dst_reg) -> spill_dst_reg
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        }
+    } else {                   // need mask
+        if (!dst_need_spill) { // no spill
+            // TODO: use vpcmpeqb and vpblendvb
+        } else { // need spill
+        }
+    }
     return NULL_INSTR;
 }
 
@@ -15308,27 +17652,75 @@ instr_t *
 vpbroadcastb_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, opnd_t dst_opnd,
                              reg_id_t src_reg, reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    // vpbroadcastb {%k0} %ebx -> %xmm2
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-
-    if (mask_reg == DR_REG_K0) { // no mask needed
-        instr_t *i1 = INSTR_CREATE_vpinsrb(dcontext, dst_opnd, dst_opnd, src_opnd, opnd_create_immed_int(0x0, OPSZ_1));
-        instr_t *i2 = INSTR_CREATE_vpbroadcastb(dcontext, dst_opnd, dst_opnd);
+    opnd_t xmm_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
+    // vmovd src_opnd -> xmm_opnd's 32 bit slot
+    instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovd, xmm_opnd, src_opnd);
+    // vpbroadcastb xmm_opnd -> xmm_opnd
+    instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastb, xmm_opnd, xmm_opnd);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+    print_rewrite_variadic_instr(dcontext, 2, i1, i2);
 #endif
-        instrlist_concat_next_instr(ilist, 2, i1, i2);
-        return i1;
-    } else { // need mask
-    }
-    return NULL_INSTR;
+    i1->next = i2;
+    return i1;
 }
 
 instr_t *
 vpbroadcastb_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               opnd_t dst_opnd, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd); // dst_reg is now DR_REG_ZMM0
+
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: { // don't need spill
+        reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
+        opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
+        // vpbroadcastb src_opnd -> dst_reg_lower
+        instr_t *i1 = INSTR_CREATE_vpbroadcastb(dcontext, op_dst_lower, src_opnd);
+        // vmovdqu dst_reg_lower -> tls(dst_lower)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu dst_reg_lower -> tls(dst_upper)
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 3, i1, i2, i3);
+#endif
+        instrlist_concat_next_instr(ilist, 3, i1, i2, i3);
+        return i1;
+    } break;
+    case 1: { // dst need spill
+        reg_id_t spill_dst_lower = YMM_SPILL_SLOT0;
+        opnd_t op_spill_dst_lower = opnd_create_reg(spill_dst_lower);
+
+        // spill_dst_lower -> tls(spill_dst_lower)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        // vpbroadcastb src_opnd -> spill_dst_lower
+        instr_t *i2 = INSTR_CREATE_vpbroadcastb(dcontext, op_spill_dst_lower, src_opnd);
+        // vmovdqu spill_dst_lower -> tls(dst_lower)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu spill_dst_lower -> tls(dst_upper)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(spill_dst_lower) -> spill_dst_lower
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastb_zmm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
+    }
     return NULL_INSTR;
 }
 
@@ -15336,14 +17728,28 @@ instr_t *
 vpbroadcastb_ymm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    return NULL_INSTR;
+    opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
+    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastb, dst_opnd, src_opnd);
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 1, new_instr1);
+#endif
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+    return new_instr1;
 }
 
 instr_t *
 vpbroadcastb_xmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    return NULL_INSTR;
+    opnd_t dst_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
+    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastb, dst_opnd, src_opnd);
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 1, new_instr1);
+#endif
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+    return new_instr1;
 }
 
 instr_t * /* 464 */
@@ -15407,50 +17813,67 @@ vpbroadcastw_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
 
     switch (dst_need_spill) {
     case 0: { // don't need spill
+        // %zmm_i -> <YMM_i, find_available_ymm_spill_slot>, avoiding conflict with ymm_i
         reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t dst_reg_upper = find_available_spill_ymm_avoiding(dst_reg_lower, DR_REG_NULL, DR_REG_NULL);
         opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
-        opnd_t op_dst_xmm = opnd_create_reg(YMM_TO_XMM(dst_reg_lower));
-        // vmovd src_opnd -> dst_xmm
-        instr_t *i1 = INSTR_CREATE_vmovd(dcontext, op_dst_xmm, src_opnd);
-        // vpbroadcastw dst_xmm -> dst_reg_lower
-        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_dst_lower, op_dst_xmm);
-        // vmovdqu16 dst_reg_lower -> tls(dst_lower)
+        opnd_t op_dst_upper = opnd_create_reg(dst_reg_upper);
+        opnd_t dst_lower_xmm = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(dst_reg_lower));
+
+        // vmovd src_opnd -> dst_lower_xmm
+        instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovd, dst_lower_xmm, src_opnd);
+        // vpbroadcastw dst_lower_xmm -> dst_reg_lower
+        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_dst_lower, dst_lower_xmm);
+        // vmovdqu dst_reg_lower -> tls(dst_lower)
         instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // vmovdqu16 dst_reg_lower -> tls(dst_upper)
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu dst_reg_lower -> dst_reg_upper (copy lower to upper)
+        instr_t *i4 = instr_create_1dst_1src(dcontext, OP_vmovdqu, op_dst_upper, op_dst_lower);
+        // vmovdqu dst_reg_upper -> tls(dst_upper)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
-        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
         return i1;
     } break;
     case 1: { // dst need spill
+        // %zmm17 -> <YMM_SPILL_SLOT0, YMM_SPILL_SLOT1> pair
         reg_id_t spill_dst_lower = YMM_SPILL_SLOT0;
+        reg_id_t spill_dst_upper = YMM_SPILL_SLOT1;
         opnd_t op_spill_dst_lower = opnd_create_reg(spill_dst_lower);
-        opnd_t op_spill_dst_xmm = opnd_create_reg(YMM_TO_XMM(spill_dst_lower));
+        opnd_t op_spill_dst_upper = opnd_create_reg(spill_dst_upper);
+        opnd_t spill_dst_lower_xmm = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(spill_dst_lower));
 
         // spill_dst_lower -> tls(spill_dst_lower)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
-        // vmovd src_opnd -> spill_dst_xmm
-        instr_t *i2 = INSTR_CREATE_vmovd(dcontext, op_spill_dst_xmm, src_opnd);
-        // vpbroadcastw spill_dst_xmm -> spill_dst_lower
-        instr_t *i3 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_lower, op_spill_dst_xmm);
-        // vmovdqu16 spill_dst_lower -> tls(dst_lower)
-        instr_t *i4 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // vmovdqu16 spill_dst_lower -> tls(dst_upper)
-        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        // spill_dst_upper -> tls(spill_dst_upper)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_upper)), OPSZ_32);
+        // vmovd src_opnd -> spill_dst_lower_xmm
+        instr_t *i3 = instr_create_1dst_1src(dcontext, OP_vmovd, spill_dst_lower_xmm, src_opnd);
+        // vpbroadcastw spill_dst_lower_xmm -> spill_dst_lower
+        instr_t *i4 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_lower, spill_dst_lower_xmm);
+        // vmovdqu64 spill_dst_lower -> tls(dst_lower)
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu64 spill_dst_lower -> spill_dst_upper (copy lower to upper)
+        instr_t *i6 = instr_create_1dst_1src(dcontext, OP_vmovdqu, op_spill_dst_upper, op_spill_dst_lower);
+        // vmovdqu64 spill_dst_upper -> tls(dst_upper)
+        instr_t *i7 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
         // tls(spill_dst_lower) -> spill_dst_lower
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        // tls(spill_dst_upper) -> spill_dst_upper
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_upper)), OPSZ_32);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+        print_rewrite_variadic_instr(dcontext, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
 #endif
-        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        instrlist_concat_next_instr(ilist, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
         return i1;
     } break;
     default: REWRITE_ERROR(STD_ERRF, "vpbroadcastw_zmm_reg2reg_gen except 0 or 1"); return NULL_INSTR;
@@ -15515,31 +17938,35 @@ vpbroadcastw_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
     instr_destroy(dcontext, instr);
 
     const uint dst_need_spill = NEED_SPILL_XMM(dst_reg) ? 1 : 0;
+
     switch (dst_need_spill) {
-    case 0: {
-        opnd_t op_dst_xmm = opnd_create_reg(dst_reg);
-        instr_t *i1 = INSTR_CREATE_vmovd(dcontext, op_dst_xmm, src_opnd);
-        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_dst_xmm, op_dst_xmm);
+    case 0: { // don't need spill
+        opnd_t xmm_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
+        // vmovd src_opnd -> xmm_opnd (move 32-bit, which includes the 16-bit word)
+        instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovd, xmm_opnd, src_opnd);
+        // vpbroadcastw xmm_opnd -> xmm_opnd
+        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, xmm_opnd, xmm_opnd);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 2, i1, i2);
 #endif
-        instrlist_concat_next_instr(ilist, 2, i1, i2);
+        i1->next = i2;
         return i1;
     } break;
-    case 1: {
+    case 1: { // dst need spill
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
-        opnd_t op_spill_dst_xmm = opnd_create_reg(spill_dst_reg);
-        // spill_dst -> tls(spill_dst)
+        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
+
+        // spill_dst_reg -> tls(spill_dst_reg)
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-        // vmovd
-        instr_t *i2 = INSTR_CREATE_vmovd(dcontext, op_spill_dst_xmm, src_opnd);
-        // vpbroadcastw
-        instr_t *i3 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_xmm, op_spill_dst_xmm);
-        // spill_dst -> tls(dst)
+        // vmovd src_opnd -> spill_dst_reg
+        instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vmovd, op_spill_dst_reg, src_opnd);
+        // vpbroadcastw spill_dst_reg -> spill_dst_reg
+        instr_t *i3 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_reg, op_spill_dst_reg);
+        // vmovdqu64 spill_dst_reg -> tls(dst_reg)
         instr_t *i4 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // tls(spill_dst) -> spill_dst
+        // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
 #ifdef DEBUG
@@ -15548,7 +17975,7 @@ vpbroadcastw_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
         instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
         return i1;
     } break;
-    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastw pattern not supported");
+    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastw_xmm_reg2reg_gen except 0 or 1"); return NULL_INSTR;
     }
     return NULL_INSTR;
 }
@@ -15560,22 +17987,22 @@ vpbroadcastw_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
-    reg_id_t dst_reg = opnd_get_reg(dst_opnd); // dst_reg is now DR_REG_ZMM0
-
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
     const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
 
     switch (dst_need_spill) {
     case 0: { // don't need spill
         reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
         opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
+
         // vpbroadcastw src_opnd -> dst_reg_lower
         instr_t *i1 = INSTR_CREATE_vpbroadcastw(dcontext, op_dst_lower, src_opnd);
-        // vmovdqu16 dst_reg_lower -> tls(dst_lower)
+        // vmovdqu dst_reg_lower -> tls(dst_lower)
         instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // vmovdqu16 dst_reg_lower -> tls(dst_upper)
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu dst_reg_lower -> tls(dst_upper)
         instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 3, i1, i2, i3);
 #endif
@@ -15588,18 +18015,18 @@ vpbroadcastw_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
 
         // spill_dst_lower -> tls(spill_dst_lower)
         instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
         // vpbroadcastw src_opnd -> spill_dst_lower
         instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_lower, src_opnd);
-        // vmovdqu16 spill_dst_lower -> tls(dst_lower)
+        // vmovdqu spill_dst_lower -> tls(dst_lower)
         instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // vmovdqu16 spill_dst_lower -> tls(dst_upper)
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu spill_dst_lower -> tls(dst_upper)
         instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_16);
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
         // tls(spill_dst_lower) -> spill_dst_lower
         instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_16);
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
@@ -15622,30 +18049,28 @@ vpbroadcastw_ymm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
 
     switch (dst_need_spill) {
     case 0: { // don't need spill
-        opnd_t op_dst_ymm = opnd_create_reg(dst_reg);
-        // vpbroadcastw src_opnd -> dst_reg
-        instr_t *i1 = INSTR_CREATE_vpbroadcastw(dcontext, op_dst_ymm, src_opnd);
+        opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
+        instr_t *new_instr1 = INSTR_CREATE_vpbroadcastw(dcontext, dst_opnd, src_opnd);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 1, i1);
+        print_rewrite_variadic_instr(dcontext, 1, new_instr1);
 #endif
-        instrlist_concat_next_instr(ilist, 1, i1);
-        return i1;
+        return new_instr1;
     } break;
     case 1: { // dst need spill
         reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
-        opnd_t op_spill_dst_ymm = opnd_create_reg(spill_dst_reg);
+        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
 
-        // spill_dst -> tls(spill_dst)
+        // spill_dst_reg -> tls(spill_dst_reg)
         instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-        // vpbroadcastw src_opnd -> spill_dst
-        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_ymm, src_opnd);
-        // spill_dst -> tls(dst)
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        // vpbroadcastw src_opnd -> spill_dst_reg
+        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_reg, src_opnd);
+        // vmovdqu spill_dst_reg -> tls(dst_reg)
         instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // tls(spill_dst) -> spill_dst
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
 #endif
@@ -15668,28 +18093,26 @@ vpbroadcastw_xmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
 
     switch (dst_need_spill) {
     case 0: { // don't need spill
-        opnd_t op_dst_xmm = opnd_create_reg(dst_reg);
-        // vpbroadcastw src_opnd -> dst_reg
-        instr_t *i1 = INSTR_CREATE_vpbroadcastw(dcontext, op_dst_xmm, src_opnd);
+        opnd_t dst_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
+        instr_t *new_instr1 = INSTR_CREATE_vpbroadcastw(dcontext, dst_opnd, src_opnd);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 1, i1);
+        print_rewrite_variadic_instr(dcontext, 1, new_instr1);
 #endif
-        instrlist_concat_next_instr(ilist, 1, i1);
-        return i1;
+        return new_instr1;
     } break;
     case 1: { // dst need spill
         reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
-        opnd_t op_spill_dst_xmm = opnd_create_reg(spill_dst_reg);
+        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
 
-        // spill_dst -> tls(spill_dst)
+        // spill_dst_reg -> tls(spill_dst_reg)
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-        // vpbroadcastw src_opnd -> spill_dst
-        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_xmm, src_opnd);
-        // spill_dst -> tls(dst)
+        // vpbroadcastw src_opnd -> spill_dst_reg
+        instr_t *i2 = INSTR_CREATE_vpbroadcastw(dcontext, op_spill_dst_reg, src_opnd);
+        // vmovdqu spill_dst_reg -> tls(dst_reg)
         instr_t *i3 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-        // tls(spill_dst) -> spill_dst
+        // tls(spill_dst_reg) -> spill_dst_reg
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
 #ifdef DEBUG
@@ -15754,34 +18177,62 @@ instr_t *
 vpbroadcastd_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                              reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-#ifdef DEBUG
-            REWRITE_ERROR(STD_ERRF, "find_and_set_unused_ymm_pair failed");
-#endif
-            return NULL_INSTR;
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
-    }
-
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-    // can't directly broadcast a gpr to simd in avx2, should first mov gpr to a simd and then broadcast
-    opnd_t ymm_down_mapping_opnd = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(dst_reg_lower));
-    opnd_t lower_ymm_opnd = opnd_create_reg(dst_reg_lower);
-    opnd_t upper_ymm_opnd = opnd_create_reg(dst_reg_upper);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovd, ymm_down_mapping_opnd, src_opnd);
-    instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastd, lower_ymm_opnd, ymm_down_mapping_opnd);
-    instr_t *new_instr3 = instr_create_1dst_1src(dcontext, OP_vmovdqa, upper_ymm_opnd, lower_ymm_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 3, new_instr1, new_instr2, new_instr3);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    new_instr2->next = new_instr3;
-    return new_instr1;
+
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+    int ymm_dst_idx = TO_YMM_REG_INDEX(dst_reg);
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+    if (k_idx == 0) {          // no mask
+        if (!dst_need_spill) { // no spill
+            reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
+            opnd_t dst_lower_xmm = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(dst_reg_lower));
+
+            // vmovd src_opnd -> dst_lower_xmm
+            instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovd, dst_lower_xmm, src_opnd);
+            // vpbroadcastd dst_lower_xmm -> dst_reg_lower
+            instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastd, op_dst_lower, dst_lower_xmm);
+            // vmovdqu dst_reg_lower -> tls(dst_lower)
+            instr_t *i3 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // vmovdqu dst_reg_upper -> tls(dst_upper)
+            instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+            return i1;
+        } else { // need spill
+            reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+            opnd_t op_ymm_spill = opnd_create_reg(spill_dst_reg);
+            opnd_t op_ymm_down_mapping_spill = opnd_create_reg(XMM_SPILL_SLOT0);
+            // spill_dst_reg -> tls(spill_dst_reg)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            // %gpr -> %xmm_opnd
+            instr_t *i2 = INSTR_CREATE_vmovd(dcontext, op_ymm_down_mapping_spill, src_opnd);
+            // %xmm_opnd -> %ymm_opnd
+            instr_t *i3 = INSTR_CREATE_vpbroadcastd(dcontext, op_ymm_spill, op_ymm_down_mapping_spill);
+            // ymm_opnd_spill -> tls(ymm_dst)
+            instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(ymm_dst_idx), OPSZ_32);
+            // tls(spill_dst_reg) -> spill_dst_reg
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        }
+    } else {                   // need mask
+        if (!dst_need_spill) { // no spill
+            // TODO: use vpcmpeqd and vpblendvb
+        } else { // need spill
+        }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -15790,16 +18241,52 @@ vpbroadcastd_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
 {
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    opnd_t ymm_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
-    reg_id_t ymm_reg = opnd_get_reg(ymm_opnd);
-    opnd_t ymm_down_mapping_opnd = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(ymm_reg));
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovd, ymm_down_mapping_opnd, src_opnd);
-    instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastd, ymm_opnd, ymm_down_mapping_opnd);
+
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+    int ymm_dst_idx = TO_YMM_REG_INDEX(dst_reg);
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+    if (k_idx == 0) {          // no mask
+        if (!dst_need_spill) { // no spill
+            opnd_t op_ymm = opnd_create_reg(dst_reg);
+            opnd_t op_ymm_down_mapping = opnd_create_reg(YMM_TO_XMM(dst_reg));
+            // %gpr -> %xmm_opnd
+            instr_t *i1 = INSTR_CREATE_vmovd(dcontext, op_ymm_down_mapping, src_opnd);
+            // %xmm_opnd -> %ymm_opnd
+            instr_t *i2 = INSTR_CREATE_vpbroadcastd(dcontext, op_ymm, op_ymm_down_mapping);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
+            print_rewrite_variadic_instr(dcontext, 2, i1, i2);
 #endif
-    new_instr1->next = new_instr2;
-    return new_instr1;
+            instrlist_concat_next_instr(ilist, 2, i1, i2);
+            return i1;
+        } else { // need spill
+            reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+            opnd_t op_ymm_spill = opnd_create_reg(spill_dst_reg);
+            opnd_t op_ymm_down_mapping_spill = opnd_create_reg(XMM_SPILL_SLOT0);
+            // spill_dst_reg -> tls(spill_dst_reg)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            // %gpr -> %xmm_opnd
+            instr_t *i2 = INSTR_CREATE_vmovd(dcontext, op_ymm_down_mapping_spill, src_opnd);
+            // %xmm_opnd -> %ymm_opnd
+            instr_t *i3 = INSTR_CREATE_vpbroadcastd(dcontext, op_ymm_spill, op_ymm_down_mapping_spill);
+            // ymm_opnd_spill -> tls(ymm_dst)
+            instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(ymm_dst_idx), OPSZ_32);
+            // tls(spill_dst_reg) -> spill_dst_reg
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        }
+    } else {                   // need mask
+        if (!dst_need_spill) { // no spill
+            // TODO: use vpcmpeqd and vpblenvb
+        } else { // need spill
+        }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -15809,13 +18296,15 @@ vpbroadcastd_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
     opnd_t xmm_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovd, xmm_opnd, src_opnd);
-    instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastd, xmm_opnd, xmm_opnd);
+    // vmovd src_opnd -> xmm_opnd's 64 bit slot
+    instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovd, xmm_opnd, src_opnd);
+    // vpbroadcastd xmm_opnd -> xmm_opnd
+    instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastd, xmm_opnd, xmm_opnd);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
+    print_rewrite_variadic_instr(dcontext, 2, i1, i2);
 #endif
-    new_instr1->next = new_instr2;
-    return new_instr1;
+    i1->next = i2;
+    return i1;
 }
 
 instr_t *
@@ -15835,10 +18324,10 @@ vpbroadcastd_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
         opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
         // vpbroadcastd src_opnd -> dst_reg_lower
         instr_t *i1 = INSTR_CREATE_vpbroadcastd(dcontext, op_dst_lower, src_opnd);
-        // vmovdqu32 dst_reg_lower -> tls(dst_lower)
+        // vmovdqu dst_reg_lower -> tls(dst_lower)
         instr_t *i2 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-        // vmovdqu32 dst_reg_lower -> tls(dst_upper)
+        // vmovdqu dst_reg_lower -> tls(dst_upper)
         instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
 #ifdef DEBUG
@@ -15962,34 +18451,86 @@ instr_t *
 vpbroadcastq_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                              reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-#ifdef DEBUG
-            REWRITE_ERROR(STD_ERRF, "find_and_set_unused_ymm_pair failed");
-#endif
-            return NULL_INSTR;
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
-    }
-
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-    // can't directly broadcast a gpr to simd in avx2, should first mov gpr to a simd and then broadcast
-    opnd_t ymm_down_mapping_opnd = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(dst_reg_lower));
-    opnd_t lower_ymm_opnd = opnd_create_reg(dst_reg_lower);
-    opnd_t upper_ymm_opnd = opnd_create_reg(dst_reg_upper);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovq, ymm_down_mapping_opnd, src_opnd);
-    instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, lower_ymm_opnd, ymm_down_mapping_opnd);
-    instr_t *new_instr3 = instr_create_1dst_1src(dcontext, OP_vmovdqa, upper_ymm_opnd, lower_ymm_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 3, new_instr1, new_instr2, new_instr3);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    new_instr2->next = new_instr3;
-    return new_instr1;
+
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+
+    if (k_idx == 0) {
+        switch (dst_need_spill) {
+        case 0: { // don't need spill
+            // %zmm_i -> <YMM_i, find_available_ymm_spill_slot>, avoiding conflict with ymm_i
+            reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
+            opnd_t dst_lower_xmm = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(dst_reg_lower));
+
+            // vmovq src_opnd -> dst_lower_xmm
+            instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovq, dst_lower_xmm, src_opnd);
+            // vpbroadcastq dst_lower_xmm -> dst_reg_lower
+            instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, op_dst_lower, dst_lower_xmm);
+            // vmovdqu dst_reg_lower -> tls(dst_lower)
+            instr_t *i3 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // vmovdqu dst_reg_upper -> tls(dst_upper)
+            instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+            return i1;
+        } break;
+        case 1: { // dst need spill
+            // %zmm17 -> <YMM_SPILL_SLOT0, YMM_SPILL_SLOT1> pair
+            reg_id_t spill_dst_lower = YMM_SPILL_SLOT0;
+            opnd_t op_spill_dst_lower = opnd_create_reg(spill_dst_lower);
+            opnd_t spill_dst_lower_xmm = opnd_create_reg(XMM_SPILL_SLOT0);
+
+            // spill_dst_lower -> tls(spill_dst_lower)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+            // vmovq src_opnd -> dst_lower_xmm
+            instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vmovq, spill_dst_lower_xmm, src_opnd);
+            // vpbroadcastq dst_lower_xmm -> dst_reg_lower
+            instr_t *i3 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, op_spill_dst_lower, spill_dst_lower_xmm);
+            // vmovdqu dst_reg_lower -> tls(dst_lower)
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // vmovdqu dst_reg_lower -> tls(dst_upper)
+            instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(spill_dst_lower) -> spill_dst_lower
+            instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+            instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+            return i1;
+        } break;
+        default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_ymm_reg2reg_gen except 0 or 1"); return NULL_INSTR;
+        }
+        return NULL_INSTR;
+    } else { // need merge mask
+        // Labels for merge mask loop
+        // instr_t *LOOP_LABEL = INSTR_CREATE_label(dcontext);
+        // instr_t *UPDATE_LABEL = INSTR_CREATE_label(dcontext);
+        // instr_t *NEXT_ITER_LABEL = INSTR_CREATE_label(dcontext);
+        // instr_t *DONE_LABEL = INSTR_CREATE_label(dcontext);
+
+        switch (dst_need_spill) {
+        case 0: { // don't need spill
+                  // TODO:
+        } break;
+        case 1: { // dst need spill
+                  // TODO:
+        } break;
+        default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_zmm_reg2reg_gen except 0 or 1"); return NULL_INSTR;
+        }
+        return NULL_INSTR;
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -15998,16 +18539,54 @@ vpbroadcastq_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
 {
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    opnd_t ymm_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
-    reg_id_t ymm_reg = opnd_get_reg(ymm_opnd);
-    opnd_t ymm_down_mapping_opnd = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(ymm_reg));
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovq, ymm_down_mapping_opnd, src_opnd);
-    instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, ymm_opnd, ymm_down_mapping_opnd);
+
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+
+    if (k_idx == 0) {
+        switch (dst_need_spill) {
+        case 0: { // don't need spill
+            opnd_t ymm_opnd = opnd_create_reg(dst_reg);
+            opnd_t ymm_down_mapping_opnd = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(dst_reg));
+            instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovq, ymm_down_mapping_opnd, src_opnd);
+            instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, ymm_opnd, ymm_down_mapping_opnd);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
+            print_rewrite_variadic_instr(dcontext, 2, i1, i2);
 #endif
-    new_instr1->next = new_instr2;
-    return new_instr1;
+            instrlist_concat_next_instr(ilist, 2, i1, i2);
+            return i1;
+        } break;
+        case 1: { // dst need spill
+            reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+            opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
+            opnd_t spill_dst_down_mapping_opnd = opnd_create_reg(YMM_INDEX_TO_XMM_INDEX(spill_dst_reg));
+
+            // spill_dst_reg -> tls(spill_dst_reg)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            // vmovq src_opnd -> spill_dst_reg
+            instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vmovq, spill_dst_down_mapping_opnd, src_opnd);
+            // vpbroadcastq spill_dst_reg -> spill_dst_reg
+            instr_t *i3 =
+                instr_create_1dst_1src(dcontext, OP_vpbroadcastq, op_spill_dst_reg, spill_dst_down_mapping_opnd);
+            // vmovdqu64 spill_dst_reg -> tls(dst_reg)
+            instr_t *i4 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // tls(spill_dst_reg) -> spill_dst_reg
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        } break;
+        default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_ymm_reg2reg_gen except 0 or 1"); return NULL_INSTR;
+        }
+    } else { // need merge mask
+             // TODO:
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -16016,14 +18595,46 @@ vpbroadcastq_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *
 {
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    opnd_t xmm_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovq, xmm_opnd, src_opnd);
-    instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, xmm_opnd, xmm_opnd);
+
+    const uint dst_need_spill = NEED_SPILL_XMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: { // don't need spill
+        opnd_t xmm_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
+        instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovq, xmm_opnd, src_opnd);
+        instr_t *new_instr2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, xmm_opnd, xmm_opnd);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
+        print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
 #endif
-    new_instr1->next = new_instr2;
-    return new_instr1;
+        new_instr1->next = new_instr2;
+        return new_instr1;
+    } break;
+    case 1: { // dst need spill
+        reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
+        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
+
+        // spill_dst_reg -> tls(spill_dst_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+        // vmovq src_opnd -> spill_dst_reg
+        instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vmovq, op_spill_dst_reg, src_opnd);
+        // vpbroadcastq spill_dst_reg -> spill_dst_reg
+        instr_t *i3 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, op_spill_dst_reg, op_spill_dst_reg);
+        // vmovdqu64 spill_dst_reg -> tls(dst_reg)
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_dst_reg) -> spill_dst_reg
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_xmm_reg2reg_gen except 0 or 1"); return NULL_INSTR;
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -16036,50 +18647,62 @@ vpbroadcastq_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
     reg_id_t dst_reg = opnd_get_reg(dst_opnd); // dst_reg is now DR_REG_ZMM0
 
     const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+    if (k_idx == 0) {
+        switch (dst_need_spill) {
+        case 0: { // don't need spill
+            reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
 
-    switch (dst_need_spill) {
-    case 0: { // don't need spill
-        reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
-        opnd_t op_dst_lower = opnd_create_reg(dst_reg_lower);
-        // vpbroadcastq src_opnd -> dst_reg_lower
-        instr_t *i1 = INSTR_CREATE_vpbroadcastq(dcontext, op_dst_lower, src_opnd);
-        // vmovdqu64 dst_reg_lower -> tls(dst_lower)
-        instr_t *i2 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_64);
-        // vmovdqu64 dst_reg_lower -> tls(dst_upper)
-        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_64);
+            // vpbroadcastq src_opnd -> dst_lower_xmm
+            instr_t *i1 = INSTR_CREATE_vpbroadcastq(dcontext, op_dst_lower, src_opnd);
+            // vmovdqu64 dst_reg_lower -> tls(dst_lower)
+            instr_t *i2 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_64);
+            // vmovdqu64 dst_reg_lower -> tls(dst_upper)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_64);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 3, i1, i2, i3);
+            print_rewrite_variadic_instr(dcontext, 3, i1, i2, i3);
 #endif
-        instrlist_concat_next_instr(ilist, 3, i1, i2, i3);
-        return i1;
-    } break;
-    case 1: { // dst need spill
-        reg_id_t spill_dst_lower = YMM_SPILL_SLOT0;
-        opnd_t op_spill_dst_lower = opnd_create_reg(spill_dst_lower);
+            instrlist_concat_next_instr(ilist, 3, i1, i2, i3);
+            return i1;
+        } break;
+        case 1: { // dst need spill
+            reg_id_t spill_dst_lower = YMM_SPILL_SLOT0;
+            opnd_t op_spill_dst_lower = opnd_create_reg(spill_dst_lower);
 
-        // spill_dst_lower -> tls(spill_dst_lower)
-        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_64);
-        // vpbroadcastq src_opnd -> spill_dst_lower
-        instr_t *i2 = INSTR_CREATE_vpbroadcastq(dcontext, op_spill_dst_lower, src_opnd);
-        // vmovdqu64 spill_dst_lower -> tls(dst_lower)
-        instr_t *i3 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_64);
-        // vmovdqu64 spill_dst_lower -> tls(dst_upper)
-        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_64);
-        // tls(spill_dst_lower) -> spill_dst_lower
-        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_64);
+            // spill_dst_lower -> tls(spill_dst_lower)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_64);
+            // vpbroadcastq src_opnd -> spill_dst_lower
+            instr_t *i2 = INSTR_CREATE_vpbroadcastq(dcontext, op_spill_dst_lower, src_opnd);
+            // vmovdqu64 spill_dst_lower -> tls(dst_lower)
+            instr_t *i3 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_64);
+            // vmovdqu64 spill_dst_lower -> tls(dst_upper)
+            instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_64);
+            // tls(spill_dst_lower) -> spill_dst_lower
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_64);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+            print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
-        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
-        return i1;
-    } break;
-    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_zmm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
+            instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+            return i1;
+        } break;
+        default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_zmm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
+        }
+    } else { // need merge mask
+        switch (dst_need_spill) {
+        case 0: { // don't need spill
+            // TODO:
+        } break;
+        case 1: { // dst need spill
+            // TODO:
+        } break;
+        }
     }
     return NULL_INSTR;
 }
@@ -16088,28 +18711,88 @@ instr_t *
 vpbroadcastq_ymm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, dst_opnd, src_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, new_instr1);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    return new_instr1;
+
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: { // don't need spill
+        opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
+        instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, dst_opnd, src_opnd);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, new_instr1);
+#endif
+        return new_instr1;
+    } break;
+    case 1: { // dst need spill
+        reg_id_t spill_dst_reg = YMM_SPILL_SLOT0;
+        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
+
+        // spill_dst_reg -> tls(spill_dst_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+        // vpbroadcastq src_opnd -> spill_dst_reg
+        instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, op_spill_dst_reg, src_opnd);
+        // vmovdqu64 spill_dst_reg -> tls(dst_reg)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(spill_dst_reg) -> spill_dst_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_ymm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
 vpbroadcastq_xmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    opnd_t dst_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, dst_opnd, src_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, new_instr1);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    return new_instr1;
+
+    const uint dst_need_spill = NEED_SPILL_XMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: { // don't need spill
+        opnd_t dst_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
+        instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, dst_opnd, src_opnd);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 1, new_instr1);
+#endif
+        return new_instr1;
+    } break;
+    case 1: { // dst need spill
+        reg_id_t spill_dst_reg = XMM_SPILL_SLOT0;
+        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
+
+        // spill_dst_reg -> tls(spill_dst_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+        // vpbroadcastq src_opnd -> spill_dst_reg
+        instr_t *i2 = instr_create_1dst_1src(dcontext, OP_vpbroadcastq, op_spill_dst_reg, src_opnd);
+        // vmovdqu64 spill_dst_reg -> tls(dst_reg)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
+        // tls(spill_dst_reg) -> spill_dst_reg
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vpbroadcastq_xmm_disp2reg_gen except 0 or 1"); return NULL_INSTR;
+    }
+    return NULL_INSTR;
 }
 
 /**
@@ -16157,44 +18840,6 @@ rw_func_vpbroadcastq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, a
     default: REWRITE_INFO(STD_OUTF, "vpbroadcastq pattern not support");
     }
     return NULL_INSTR;
-}
-
-/**
- * @brief 24 vcvtss2si
- * vcvttss2usi %xmm0[4byte] -> %rax
- */
-instr_t *
-rw_func_vcvtss2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
-    // cvttss2si %xmm0(src1), %eax
-    // mov %eax, %rax
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    opnd_t src_opnd = instr_get_src(instr, 0);
-    opnd_t dst_opnd = instr_get_dst(instr, 0);
-
-    instr_t *i1 = INSTR_CREATE_vcvtss2si(dcontext, dst_opnd, src_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, i1);
-#endif
-    return i1;
-}
-
-instr_t * /* 25 */
-rw_func_vcvtsd2si(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    opnd_t src_opnd = instr_get_src(instr, 0);
-    opnd_t dst_opnd = instr_get_dst(instr, 0);
-
-    instr_t *i1 = INSTR_CREATE_vcvtsd2si(dcontext, dst_opnd, src_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, i1);
-#endif
-    return i1;
 }
 
 instr_t *
@@ -16251,6 +18896,10 @@ rw_func_vcvttsd2usi(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, ap
     dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "dst:");
 #endif
 
+    if (DYNAMO_OPTION(quick_rw)) {
+        return fast_rw_func_vcvttsd2usi(dcontext, ilist, instr, src_opnd, dst_opnd);
+    }
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -16301,6 +18950,7 @@ rw_func_vcvttsd2usi(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, ap
     } else {
         DR_ASSERT_MSG(false, "vcvttsd2usi: unsupported src");
     }
+
     opnd_t src_for_load32 = src_for_load64;
 
     opnd_t op64_scrach1 = opnd_create_reg(reg64_scrach1);
@@ -16490,6 +19140,10 @@ rw_func_vcvttss2usi(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, ap
     dr_print_opnd(dcontext, STD_OUTF, src_opnd, "src:");
     dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "dst:");
 #endif
+
+    if (DYNAMO_OPTION(quick_rw)) {
+        return fast_rw_func_vcvttss2usi(dcontext, ilist, instr, src_opnd, dst_opnd);
+    }
 
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
@@ -16713,8 +19367,13 @@ rw_func_vcvtusi2sd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app
     dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "dst:");
 #endif
 
+    if (DYNAMO_OPTION(quick_rw)) {
+        return fast_rw_func_vcvtusi2sd(dcontext, ilist, instr, src_opnd1, src_opnd2, dst_opnd);
+    }
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
+
     reg_id_t src_xmm_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t dst_xmm_reg = opnd_get_reg(dst_opnd);
     src_opnd1 = create_mapping_xmm_opnd(dcontext, src_xmm_reg1);
@@ -17400,6 +20059,7 @@ instr_t *
 vmovdqu16_xmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
     opnd_t src_opnd = create_mapping_xmm_opnd(dcontext, src_reg);
     opnd_t dst_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
     instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovdqu, dst_opnd, src_opnd);
@@ -17415,6 +20075,7 @@ instr_t *
 vmovdqu16_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
+    // FIXME: remain mask reg not take into account
     opnd_t src_opnd = create_mapping_ymm_opnd(dcontext, src_reg);
     opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
     instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovdqu, dst_opnd, src_opnd);
@@ -17430,44 +20091,129 @@ instr_t *
 vmovdqu16_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF,
-                 "vmovdqu_zmm_reg2reg_gen: src_reg_lower{ymm%d}, src_reg_upper{ymm%d}, dst_reg_lower{ymm%d}, "
-                 "dst_reg_upper{ymm%d}",
-                 src_reg_lower - DR_REG_YMM0, src_reg_upper - DR_REG_YMM0, dst_reg_lower - DR_REG_YMM0,
-                 dst_reg_upper - DR_REG_YMM0);
-#endif
-
-    instr_t *new_instr1 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_lower), opnd_create_reg(src_reg_lower));
-    instr_t *new_instr2 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_upper), opnd_create_reg(src_reg_upper));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr1;
+
+    const uint src_need_spill_flag = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_ZMM(dst_reg) ? 2 : 0;
+    const uint need_spill_flag = src_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { // no spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_upper = find_available_spill_ymm_avoiding(src_lower, dst_lower, DR_REG_NULL);
+
+        opnd_t op_src_lower = opnd_create_reg(src_lower);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_upper -> tls(src_upper)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+
+        // vmovdqu op_src_lower -> op_dst_lower
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_lower);
+        // tls(src high 256bits) -> op_src_upper
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // op_src_upper -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_upper) -> src_upper
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { // src need spill
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_spill_reg = find_one_available_spill_ymm(dst_lower);
+
+        opnd_t op_src_spill = opnd_create_reg(src_spill_reg);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_spill -> tls(src_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+        // tls(src lower 256bits) -> src_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_spill -> dst_lower
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_spill);
+
+        // tls(src high 256bits) -> src_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // src_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_spill) -> src_spill
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    case 2: { // dst need spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_spill_reg = find_one_available_spill_ymm(src_lower);
+
+        // dst_spill -> tls(dst_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // src_lower -> tls(dst lower 256bits)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> dst_spill
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // dst_spill -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill) -> dst_spill
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 3: { // both need spill
+        reg_id_t ymm_spill = YMM_SPILL_SLOT0;
+
+        // ymm_spill -> tls(ymm_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+        // tls(src lower 256bits) -> ymm_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // ymm_spill -> tls(dst lower 256bits
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> ymm_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // ymm_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill) -> ymm_spill
+        instr_t *i6 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    default: {
+        REWRITE_ERROR(STD_ERRF, "vmovdqu64_zmm_reg2reg_gen not support pattern");
+    }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -17493,6 +20239,7 @@ vmovdqu16_ymm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
     int k_idx = TO_K_REG_INDEX(mask_reg);
     if (k_idx == 0) {
+        // FIXME: src need spill not taken into account
         opnd_t src_opnd = create_mapping_ymm_opnd(dcontext, src_reg);
         instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovdqu, dst_opnd, src_opnd);
 #ifdef DEBUG
@@ -17641,71 +20388,98 @@ instr_t *
 vmovdqu16_zmm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, opnd_t dst_opnd,
                            reg_id_t mask_reg)
 {
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
-    int disp = opnd_get_disp(dst_opnd);
-    // int opsz = opnd_get_size(dst_opnd);
-    reg_id_t dst_base_reg = opnd_get_base(dst_opnd);
-    reg_id_t dst_index_reg = opnd_get_index(dst_opnd);
-    int scale = opnd_get_scale(dst_opnd);
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND)
-            return NULL_INSTR;
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
-
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF, "vmovdqu_zmm_reg2disp_gen: src_reg_lower{ymm%d}, src_reg_upper{ymm%d}",
-                 src_reg_lower - DR_REG_YMM0, src_reg_upper - DR_REG_YMM0);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
-    instr_t *i1 = instr_create_1dst_1src(dcontext, OP_vmovdqu,
-                                         opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32),
-                                         opnd_create_reg(src_reg_lower));
-    instr_t *i2 = instr_create_1dst_1src(
-        dcontext, OP_vmovdqu, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
-        opnd_create_reg(src_reg_upper));
+    int disp = opnd_get_disp(dst_opnd);
+    reg_id_t dst_base_reg = opnd_get_base(dst_opnd);
+    reg_id_t dst_index_reg = opnd_get_index(dst_opnd);
+    int scale = opnd_get_scale(dst_opnd);
+
+    const uint dst_need_spill = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    switch (dst_need_spill) {
+    case 0: { /* no spill */
+        reg_id_t src_reg_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t src_reg_upper = find_one_available_spill_ymm(src_reg_lower);
+
+        opnd_t op_src_reg_lower = opnd_create_reg(src_reg_lower);
+        opnd_t op_src_reg_upper = opnd_create_reg(src_reg_upper);
+
+        // src_reg_upper -> tls(src_reg_upper)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg_upper)), OPSZ_32);
+        // tls(src_upper) -> src_reg_upper
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_lower) -> src_reg_lower
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_reg_lower -> dst_opnd_lower
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_src_reg_lower);
+        // vmovdqu src_reg_upper -> dst_opnd_upper
+        instr_t *i5 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
+            op_src_reg_upper);
+        // tls(src_reg_upper) -> src_reg_upper
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg_upper)), OPSZ_32);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
 #endif
-    i1->next = i2;
-    return i1;
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    case 1: { /* dst need spill */
+        reg_id_t spill_src_reg = YMM_SPILL_SLOT0;
+        reg_id_t spill_src_reg_upper = find_one_available_spill_ymm(spill_src_reg);
+
+        opnd_t op_spill_src_reg = opnd_create_reg(spill_src_reg);
+        opnd_t op_spill_src_reg_upper = opnd_create_reg(spill_src_reg_upper);
+
+        // spill_src_reg -> tls(spill_src_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg)), OPSZ_32);
+        // spill_src_reg_upper -> tls(spill_src_reg_upper)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg_upper)), OPSZ_32);
+        // tls(src_lower) -> spill_src_reg
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // tls(src_upper) -> spill_src_reg_upper
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu spill_src_reg -> dst_opnd_lower
+        instr_t *i5 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_spill_src_reg);
+        // vmovdqu spill_src_reg_upper -> dst_opnd_upper
+        instr_t *i6 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
+            op_spill_src_reg_upper);
+        // tls(spill_src_reg) -> spill_src_reg
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg)), OPSZ_32);
+        // tls(spill_src_reg_upper) -> spill_src_reg_upper
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+        instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+        return i1;
+    } break;
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
 vmovdqu16_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                               opnd_t dst_opnd, reg_id_t mask_reg)
 {
-    // vmovdqu16 {%k0} %zmm1 -> <rel> 0x00007f4444daf5e2[64byte]
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND)
-            return NULL_INSTR;
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
-
-    opnd_t op_src_reg_lower = opnd_create_reg(src_reg_lower);
-    opnd_t op_src_reg_upper = opnd_create_reg(src_reg_upper);
-
-    // vmovdqu src_reg_lower -> dst_opnd_lower
-    instr_t *i1 = INSTR_CREATE_vmovdqu(dcontext, dst_opnd, op_src_reg_lower);
-    // vmovdqu src_reg_upper -> dst_opnd_upper
-    instr_t *i2 = INSTR_CREATE_vmovdqu(
-        dcontext, opnd_create_rel_addr((void *)((char *)opnd_get_addr(dst_opnd) + SIZE_OF_YMM), OPSZ_32),
-        op_src_reg_upper);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, i1, i2);
+    REWRITE_ERROR(STD_ERRF, "zmm reg->rel_addr not support");
 #endif
-    instrlist_concat_next_instr(ilist, 2, i1, i2);
-    return i1;
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -17975,7 +20749,6 @@ instr_t *
 vmovdqu16_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, reg_id_t dst_reg,
                            reg_id_t mask_reg)
 {
-    // vmovdqu16 0x00000140(%rsp)[64byte] -> %zmm1
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
@@ -17985,78 +20758,67 @@ vmovdqu16_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
     int disp = opnd_get_disp(src_opnd);
 
     const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+
     switch (dst_need_spill) {
     case 0: { /* no spill */
-        reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
-        reg_id_t dst_reg_upper = find_one_available_spill_ymm(dst_reg_lower);
+        reg_id_t dst_spill_high_reg = find_one_available_spill_ymm(ZMM_TO_YMM(dst_reg));
+        opnd_t op_dst_spill_high = opnd_create_reg(dst_spill_high_reg);
+        opnd_t op_dst_low = opnd_create_reg(ZMM_TO_YMM(dst_reg));
 
-        opnd_t op_dst_reg_lower = opnd_create_reg(dst_reg_lower);
-        opnd_t op_dst_reg_upper = opnd_create_reg(dst_reg_upper);
-
-        // dst_reg_upper -> tls(dst_reg_upper)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
-        // vmovdqu16 src_low -> dst_reg_lower
-        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_reg_lower,
+        // dst_spill_high_reg -> tls(dst_spill_high_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_low_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_low,
                                            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
-        // vmovdqu16 src_high -> dst_reg_upper
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_high_reg
         instr_t *i3 = INSTR_CREATE_vmovdqu(
-            dcontext, op_dst_reg_upper,
+            dcontext, op_dst_spill_high,
             opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
-        // dst_reg_lower -> tls(dst_lower)
-        instr_t *i4 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-        // dst_reg_upper -> tls(dst_upper)
-        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+        // dst_spill_high_reg -> tls(dst_reg high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // tls(dst_reg_upper) -> dst_reg_upper
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+        // tls(dst_spill_high_reg) -> dst_spill_high_reg
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { /* dst need spill */
+        reg_id_t dst_spill_reg = YMM_SPILL_SLOT0;
+        opnd_t op_dst_spill = opnd_create_reg(dst_spill_reg);
+
+        // dst_spill_reg -> tls(dst_spill_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_spill,
+                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg low 256bits)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_reg
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, op_dst_spill,
+            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill_reg) -> dst_spill_reg
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
 #endif
         instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
         return i1;
     } break;
-    case 1: { /* dst need spill */
-        reg_id_t spill_dst_reg = find_one_available_spill_ymm(DR_REG_NULL);
-        reg_id_t spill_dst_reg_upper = find_one_available_spill_ymm(spill_dst_reg);
-
-        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
-        opnd_t op_spill_dst_reg_upper = opnd_create_reg(spill_dst_reg_upper);
-
-        // spill_dst_reg -> tls(spill_dst_reg)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-        // spill_dst_reg_upper -> tls(spill_dst_reg_upper)
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg_upper)), OPSZ_32);
-        // vmovdqu16 src_low -> spill_dst_reg
-        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst_reg,
-                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
-        // vmovdqu16 src_high -> spill_dst_reg_upper
-        instr_t *i4 = INSTR_CREATE_vmovdqu(
-            dcontext, op_spill_dst_reg_upper,
-            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
-        // spill_dst_reg -> tls(dst_lower)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-        // spill_dst_reg_upper -> tls(dst_upper)
-        instr_t *i6 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // tls(spill_dst_reg) -> spill_dst_reg
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-        // tls(spill_dst_reg_upper) -> spill_dst_reg_upper
-        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg_upper)), OPSZ_32);
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
-#endif
-        instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
-        return i1;
-    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vmovdqu16_zmm_disp2reg_gen not support");
     }
+
     return NULL_INSTR;
 }
 
@@ -18159,37 +20921,10 @@ instr_t *
 vmovdqu16_zmm_absaddr2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
-    reg_id_t dst_reg_upper = find_one_available_spill_ymm(dst_reg_lower);
-
-    opnd_t op_dst_reg_lower = opnd_create_reg(dst_reg_lower);
-    opnd_t op_dst_reg_upper = opnd_create_reg(dst_reg_upper);
-
-    // dst_reg_upper -> tls(dst_reg_upper)
-    instr_t *i1 =
-        SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
-    // vmovdqu src_opnd_lower -> dst_reg_lower
-    instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_reg_lower, src_opnd);
-    // vmovdqu src_opnd_upper -> dst_reg_upper
-    instr_t *i3 =
-        INSTR_CREATE_vmovdqu(dcontext, op_dst_reg_upper,
-                             opnd_create_abs_addr((void *)((char *)opnd_get_addr(src_opnd) + SIZE_OF_YMM), OPSZ_32));
-    // dst_reg_lower -> tls(dst_reg)
-    instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-    // dst_reg_upper -> tls(dst_reg + SIZE_OF_YMM)
-    instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                         TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
-    // tls(dst_reg_upper) -> dst_reg_upper
-    instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+    REWRITE_ERROR(STD_ERRF, "vmovdqu_zmm_absaddr2reg_gen not support");
 #endif
-    instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
-    return i1;
+    return NULL_INSTR;
 }
 
 /**
@@ -18341,59 +21076,620 @@ instr_t *
 vmovdqu32_ymm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
-    opnd_t src_opnd = create_mapping_ymm_opnd(dcontext, src_reg);
-    opnd_t dst_opnd = create_mapping_ymm_opnd(dcontext, dst_reg);
-    instr_t *new_instr1 = instr_create_1dst_1src(dcontext, OP_vmovdqu, dst_opnd, src_opnd);
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 1, new_instr1);
-#endif
+    // vmovdqu32 {%k0} %ymm0, %ymm1
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    return new_instr1;
+
+    const uint src_need_spill = NEED_SPILL_YMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill = NEED_SPILL_YMM(dst_reg) ? 2 : 0;
+    const uint need_spill_flag = src_need_spill | dst_need_spill;
+
+    int k_idx = TO_K_REG_INDEX(mask_reg);
+    bool is_zero_mask = is_avx512_zero_mask(instr);
+
+    if (k_idx == 0) { // no mask, no spill behavior is identical to vmovdqu64 (just a copy)
+        switch (need_spill_flag) {
+        case 0: { /* no spill */
+            opnd_t src_opnd = opnd_create_reg(src_reg);
+            opnd_t dst_opnd = opnd_create_reg(dst_reg);
+            instr_t *new_instr1 = INSTR_CREATE_vmovdqu(dcontext, dst_opnd, src_opnd);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, new_instr1);
+#endif
+            return new_instr1;
+        } break;
+        case 1: { /* src need spill */
+            instr_t *i1 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } break;
+        case 2: { /* dst need spill */
+            instr_t *i1 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, src_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            instrlist_concat_next_instr(ilist, 1, i1);
+            return i1;
+        } break;
+        case 3: { /* src and dst need spill */
+            reg_id_t spill_tmp_reg = YMM_SPILL_SLOT0;
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_tmp_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_tmp_reg)), OPSZ_32);
+            instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_tmp_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg)), OPSZ_32);
+            instr_t *i3 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_tmp_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_tmp_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_tmp_reg)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+            return i1;
+        } break;
+        default: {
+            REWRITE_ERROR(STD_ERRF, "vmovdqu32_ymm_reg2reg_gen not support pattern");
+        }
+            return NULL_INSTR;
+        }
+    } else { // use k1~k7, rewrite logic for 32-bit granularity
+        switch (need_spill_flag) {
+        case 0: { /* no spill */
+            instr_t *SKIP_LOAD = INSTR_CREATE_label(dcontext);
+            instr_t *FULL_LOAD = INSTR_CREATE_label(dcontext);
+            reg_id_t scratch_reg_gpr64 = DR_REG_RAX;
+            reg_id_t scratch_reg_gpr32 = DR_REG_EAX;
+            opnd_t scratch_opnd_gpr64 = opnd_create_reg(scratch_reg_gpr64);
+            opnd_t scratch_opnd_gpr32 = opnd_create_reg(scratch_reg_gpr32);
+            reg_id_t ymm_dst = dst_reg;
+            reg_id_t ymm_src = src_reg;
+            reg_id_t ymm_bit_pattern = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+            reg_id_t ymm_mask = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_bit_pattern);
+            reg_id_t xmm_mask = ymm_mask - DR_REG_YMM0 + DR_REG_XMM0;
+            reg_id_t ymm_final_dst =
+                find_available_spill_ymm_avoiding_variadic(4, src_reg, dst_reg, ymm_bit_pattern, ymm_mask);
+
+            /* opnd for scratch ymms */
+            opnd_t ymm_dst_opnd = opnd_create_reg(ymm_dst);
+            opnd_t ymm_src_opnd = opnd_create_reg(ymm_src);
+            opnd_t ymm_bit_pattern_opnd = opnd_create_reg(ymm_bit_pattern);
+            opnd_t ymm_mask_opnd = opnd_create_reg(ymm_mask);
+            opnd_t xmm_mask_opnd = opnd_create_reg(xmm_mask);
+            opnd_t ymm_final_dst_opnd = opnd_create_reg(ymm_final_dst);
+
+            // push rax;
+            instr_t *i1 = INSTR_CREATE_push(dcontext, scratch_opnd_gpr64);
+            // push eflags;
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // tls_slot(mask_reg) -> eax
+            instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, DR_REG_EAX, TLS_K_idx_SLOT(k_idx), OPSZ_4);
+            // test eax, eax
+            instr_t *i4 = INSTR_CREATE_test(dcontext, scratch_opnd_gpr32, scratch_opnd_gpr32);
+            // jz SKIP_LOAD
+            instr_t *i5 = INSTR_CREATE_jcc(dcontext, OP_jz, opnd_create_instr(SKIP_LOAD));
+            // cmpl 0xf, eax (for 64-bit elements, only 4 bits matter in YMM)
+            instr_t *i6 = INSTR_CREATE_cmp(dcontext, opnd_create_reg(DR_REG_EAX), opnd_create_immed_int(0xff, OPSZ_4));
+            // je FULL_LOAD
+            instr_t *i7 = INSTR_CREATE_jcc(dcontext, OP_je, opnd_create_instr(FULL_LOAD));
+            // spill ymm_bit_pattern
+            instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_bit_pattern,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_bit_pattern)), OPSZ_32);
+            // spill ymm_mask
+            instr_t *i9 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_mask, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_mask)), OPSZ_32);
+            // spill ymm_final_dst
+            instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_final_dst,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_final_dst)), OPSZ_32);
+            // sub rsp 32
+            instr_t *i11 =
+                INSTR_CREATE_sub(dcontext, opnd_create_reg(DR_REG_RSP), opnd_create_immed_int(SIZE_OF_YMM, OPSZ_4));
+            // 0x0000000200000001
+            instr_t *i12 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000000200000001ULL, OPSZ_8));
+            instr_t *i13 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 0, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            // 0x0000000800000004
+            instr_t *i14 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000000800000004ULL, OPSZ_8));
+            instr_t *i15 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 8, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            // 0x0000002000000010
+            instr_t *i16 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000002000000010ULL, OPSZ_8));
+            instr_t *i17 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 16, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            // 0x0000008000000040
+            instr_t *i18 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000008000000040ULL, OPSZ_8));
+            instr_t *i19 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 24, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            // vmovdqu (%rsp), %ymm_bit_pattern | bit pattern get the constant value
+            instr_t *i20 = INSTR_CREATE_vmovdqu(dcontext, ymm_bit_pattern_opnd,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 0, OPSZ_32));
+            // add rsp 32
+            instr_t *i21 =
+                INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), opnd_create_immed_int(SIZE_OF_YMM, OPSZ_4));
+            // Mask Gen
+            instr_t *i22 = RESTORE_FROM_SIZED_TLS(dcontext, DR_REG_EAX, TLS_K_idx_SLOT(k_idx), OPSZ_4);
+            instr_t *i23 = INSTR_CREATE_vmovd(dcontext, xmm_mask_opnd, scratch_opnd_gpr32);
+            instr_t *i24 = INSTR_CREATE_vpbroadcastd(dcontext, ymm_mask_opnd, xmm_mask_opnd);
+            instr_t *i25 = INSTR_CREATE_vpand(dcontext, ymm_mask_opnd, ymm_mask_opnd, ymm_bit_pattern_opnd);
+            instr_t *i26 = INSTR_CREATE_vpcmpeqd(dcontext, ymm_mask_opnd, ymm_mask_opnd, ymm_bit_pattern_opnd);
+
+            // Blend: dest uses ymm_dst as 'else' source
+            instr_t *i27 =
+                INSTR_CREATE_vpblendvb(dcontext, ymm_final_dst_opnd, ymm_dst_opnd, ymm_src_opnd, ymm_mask_opnd);
+
+            instr_t *i28 = INSTR_CREATE_vmovdqu(dcontext, ymm_dst_opnd, ymm_final_dst_opnd);
+
+            // Restore
+            instr_t *i29 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_bit_pattern,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_bit_pattern)), OPSZ_32);
+            instr_t *i30 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_mask, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_mask)), OPSZ_32);
+            instr_t *i31 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_final_dst,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_final_dst)), OPSZ_32);
+
+            instr_t *i32 = INSTR_CREATE_jmp(dcontext, opnd_create_instr(SKIP_LOAD));
+
+            // FULL_LOAD
+            instr_t *i33 = INSTR_CREATE_vmovdqu(dcontext, ymm_dst_opnd, ymm_src_opnd);
+
+            // SKIP_LOAD
+            instr_t *i34 = INSTR_CREATE_popf(dcontext);
+            instr_t *i35 = INSTR_CREATE_pop(dcontext, scratch_opnd_gpr64);
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 37, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                         i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31,
+                                         i32, FULL_LOAD, i33, SKIP_LOAD, i34, i35);
+#endif
+            instrlist_concat_next_instr(ilist, 37, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                        i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31,
+                                        i32, FULL_LOAD, i33, SKIP_LOAD, i34, i35);
+            return i1;
+        }
+        case 1: { /* src need spill */
+            instr_t *SKIP_LOAD = INSTR_CREATE_label(dcontext);
+            instr_t *FULL_LOAD = INSTR_CREATE_label(dcontext);
+
+            reg_id_t scratch_reg_gpr64 = DR_REG_RAX;
+            reg_id_t scratch_reg_gpr32 = DR_REG_EAX;
+            opnd_t scratch_opnd_gpr64 = opnd_create_reg(scratch_reg_gpr64);
+            opnd_t scratch_opnd_gpr32 = opnd_create_reg(scratch_reg_gpr32);
+
+            reg_id_t ymm_dst = dst_reg;
+            // Find a scratch register to hold loaded src, avoiding dst
+            reg_id_t spill_src_reg = find_one_available_spill_ymm(dst_reg);
+            reg_id_t ymm_bit_pattern = find_available_spill_ymm_avoiding(spill_src_reg, dst_reg, DR_REG_NULL);
+            reg_id_t ymm_mask = find_available_spill_ymm_avoiding(spill_src_reg, dst_reg, ymm_bit_pattern);
+            reg_id_t xmm_mask = ymm_mask - DR_REG_YMM0 + DR_REG_XMM0;
+            reg_id_t ymm_final_dst =
+                find_available_spill_ymm_avoiding_variadic(4, spill_src_reg, dst_reg, ymm_bit_pattern, ymm_mask);
+
+            // If Zero Masking, we need an 'else' source (zero)
+            reg_id_t ymm_else_src = DR_REG_NULL;
+            opnd_t ymm_else_src_opnd;
+            instr_t *i_spill_else_src = NULL_INSTR;
+            instr_t *i_prepare_else_src = NULL_INSTR;
+            instr_t *i_restore_else_src = NULL_INSTR;
+
+            if (is_zero_mask) {
+                ymm_else_src = find_available_spill_ymm_avoiding_variadic(5, spill_src_reg, dst_reg, ymm_bit_pattern,
+                                                                          ymm_mask, ymm_final_dst);
+                ymm_else_src_opnd = opnd_create_reg(ymm_else_src);
+                i_spill_else_src = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_else_src,
+                                                          TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_else_src)), OPSZ_32);
+                i_prepare_else_src =
+                    INSTR_CREATE_vpxor(dcontext, ymm_else_src_opnd, ymm_else_src_opnd, ymm_else_src_opnd);
+                i_restore_else_src = RESTORE_SIMD_FROM_SIZED_TLS(
+                    dcontext, ymm_else_src, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_else_src)), OPSZ_32);
+            }
+
+            /* opnd for scratch ymms */
+            opnd_t spill_src_opnd = opnd_create_reg(spill_src_reg);
+            opnd_t ymm_dst_opnd = opnd_create_reg(ymm_dst);
+            opnd_t ymm_bit_pattern_opnd = opnd_create_reg(ymm_bit_pattern);
+            opnd_t ymm_mask_opnd = opnd_create_reg(ymm_mask);
+            opnd_t xmm_mask_opnd = opnd_create_reg(xmm_mask);
+            opnd_t ymm_final_dst_opnd = opnd_create_reg(ymm_final_dst);
+
+            instr_t *i1 = INSTR_CREATE_push(dcontext, scratch_opnd_gpr64);
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // spill_src_reg -> tls (save scratch)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg)), OPSZ_32);
+            // tls(src_reg) -> spill_src_reg (load src)
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg)), OPSZ_32);
+
+            instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, DR_REG_EAX, TLS_K_idx_SLOT(k_idx), OPSZ_4);
+
+            // Check for 0 mask (optimization)
+            instr_t *i6 = INSTR_CREATE_test(dcontext, scratch_opnd_gpr32, scratch_opnd_gpr32);
+            // For Merge: Mask 0 -> Skip (preserve dst). For Zero: Mask 0 -> Proceed (blend with 0)
+            instr_t *i7 = NULL_INSTR;
+            if (!is_zero_mask) {
+                i7 = INSTR_CREATE_jcc(dcontext, OP_jz, opnd_create_instr(SKIP_LOAD));
+            }
+
+            // Check for Full Mask
+            instr_t *i8 = INSTR_CREATE_cmp(dcontext, opnd_create_reg(DR_REG_EAX), opnd_create_immed_int(0xff, OPSZ_4));
+            instr_t *i9 = INSTR_CREATE_jcc(dcontext, OP_je, opnd_create_instr(FULL_LOAD));
+
+            instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_bit_pattern,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_bit_pattern)), OPSZ_32);
+            instr_t *i11 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_mask, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_mask)), OPSZ_32);
+            instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_final_dst,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_final_dst)), OPSZ_32);
+            instr_t *i_spill_else = is_zero_mask ? i_spill_else_src : NULL_INSTR;
+
+            // Construct 32-bit Bit Pattern
+            instr_t *i13 =
+                INSTR_CREATE_sub(dcontext, opnd_create_reg(DR_REG_RSP), opnd_create_immed_int(SIZE_OF_YMM, OPSZ_4));
+            instr_t *i14 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000000200000001ULL, OPSZ_8));
+            instr_t *i15 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 0, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            instr_t *i16 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000000800000004ULL, OPSZ_8));
+            instr_t *i17 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 8, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            instr_t *i18 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000002000000010ULL, OPSZ_8));
+            instr_t *i19 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 16, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            instr_t *i20 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000008000000040ULL, OPSZ_8));
+            instr_t *i21 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 24, OPSZ_8),
+                                               scratch_opnd_gpr64);
+
+            instr_t *i22 = INSTR_CREATE_vmovdqu(dcontext, ymm_bit_pattern_opnd,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 0, OPSZ_32));
+            instr_t *i23 =
+                INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), opnd_create_immed_int(SIZE_OF_YMM, OPSZ_4));
+
+            instr_t *i_prep_else = is_zero_mask ? i_prepare_else_src : NULL_INSTR;
+
+            instr_t *i24 = RESTORE_FROM_SIZED_TLS(dcontext, DR_REG_EAX, TLS_K_idx_SLOT(k_idx), OPSZ_4);
+            instr_t *i25 = INSTR_CREATE_vmovd(dcontext, xmm_mask_opnd, scratch_opnd_gpr32);
+            instr_t *i26 = INSTR_CREATE_vpbroadcastd(dcontext, ymm_mask_opnd, xmm_mask_opnd);
+            instr_t *i27 = INSTR_CREATE_vpand(dcontext, ymm_mask_opnd, ymm_mask_opnd, ymm_bit_pattern_opnd);
+            instr_t *i28 = INSTR_CREATE_vpcmpeqd(dcontext, ymm_mask_opnd, ymm_mask_opnd, ymm_bit_pattern_opnd);
+
+            // Blend: if Merge, else=ymm_dst. If Zero, else=ymm_else_src(0).
+            opnd_t else_opnd = is_zero_mask ? ymm_else_src_opnd : ymm_dst_opnd;
+            instr_t *i29 =
+                INSTR_CREATE_vpblendvb(dcontext, ymm_final_dst_opnd, else_opnd, spill_src_opnd, ymm_mask_opnd);
+
+            instr_t *i30 = INSTR_CREATE_vmovdqu(dcontext, ymm_dst_opnd, ymm_final_dst_opnd);
+
+            instr_t *i31 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_bit_pattern,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_bit_pattern)), OPSZ_32);
+            instr_t *i32 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_mask, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_mask)), OPSZ_32);
+            instr_t *i33 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_final_dst,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_final_dst)), OPSZ_32);
+            instr_t *i_rst_else = is_zero_mask ? i_restore_else_src : NULL_INSTR;
+
+            instr_t *i34 = INSTR_CREATE_jmp(dcontext, opnd_create_instr(SKIP_LOAD));
+
+            // FULL_LOAD:
+            instr_t *i35 = INSTR_CREATE_vmovdqu(dcontext, ymm_dst_opnd, spill_src_opnd);
+
+            // SKIP_LOAD:
+            instr_t *i36 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg)), OPSZ_32);
+            instr_t *i37 = INSTR_CREATE_popf(dcontext);
+            instr_t *i38 = INSTR_CREATE_pop(dcontext, scratch_opnd_gpr64);
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 40, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i_spill_else,
+                                         i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i_prep_else, i24, i25,
+                                         i26, i27, i28, i29, i30, i31, i32, i33, i_rst_else, i34, FULL_LOAD, i35,
+                                         SKIP_LOAD, i36, i37, i38);
+#endif
+            instrlist_concat_next_instr(ilist, 40, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i_spill_else, i13,
+                                        i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i_prep_else, i24, i25, i26,
+                                        i27, i28, i29, i30, i31, i32, i33, i_rst_else, i34, FULL_LOAD, i35, SKIP_LOAD,
+                                        i36, i37, i38);
+            return i1;
+        } break;
+        case 2: { /* dst need spill */
+            // Similar logic: load dst (if Merge), blend, store dst.
+            instr_t *SKIP_LOAD = INSTR_CREATE_label(dcontext);
+            instr_t *FULL_LOAD = INSTR_CREATE_label(dcontext);
+
+            reg_id_t scratch_reg_gpr64 = DR_REG_RAX;
+            reg_id_t scratch_reg_gpr32 = DR_REG_EAX;
+            opnd_t scratch_opnd_gpr64 = opnd_create_reg(scratch_reg_gpr64);
+            opnd_t scratch_opnd_gpr32 = opnd_create_reg(scratch_reg_gpr32);
+
+            reg_id_t ymm_src = src_reg;
+            reg_id_t spill_dst_reg = find_one_available_spill_ymm(src_reg);
+            reg_id_t ymm_bit_pattern = find_available_spill_ymm_avoiding(spill_dst_reg, src_reg, DR_REG_NULL);
+            reg_id_t ymm_mask = find_available_spill_ymm_avoiding(spill_dst_reg, src_reg, ymm_bit_pattern);
+            reg_id_t xmm_mask = ymm_mask - DR_REG_YMM0 + DR_REG_XMM0;
+            reg_id_t ymm_final_dst =
+                find_available_spill_ymm_avoiding_variadic(4, spill_dst_reg, src_reg, ymm_bit_pattern, ymm_mask);
+
+            // Zero Masking Logic
+            reg_id_t ymm_else_src = DR_REG_NULL;
+            opnd_t ymm_else_src_opnd;
+            instr_t *i_spill_else_src = NULL_INSTR;
+            instr_t *i_prepare_else_src = NULL_INSTR;
+            instr_t *i_restore_else_src = NULL_INSTR;
+
+            if (is_zero_mask) {
+                ymm_else_src = find_available_spill_ymm_avoiding_variadic(5, spill_dst_reg, src_reg, ymm_bit_pattern,
+                                                                          ymm_mask, ymm_final_dst);
+                ymm_else_src_opnd = opnd_create_reg(ymm_else_src);
+                i_spill_else_src = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_else_src,
+                                                          TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_else_src)), OPSZ_32);
+                i_prepare_else_src =
+                    INSTR_CREATE_vpxor(dcontext, ymm_else_src_opnd, ymm_else_src_opnd, ymm_else_src_opnd);
+                i_restore_else_src = RESTORE_SIMD_FROM_SIZED_TLS(
+                    dcontext, ymm_else_src, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_else_src)), OPSZ_32);
+            }
+
+            /* opnd for scratch ymms */
+            opnd_t spill_dst_opnd = opnd_create_reg(spill_dst_reg);
+            opnd_t ymm_src_opnd = opnd_create_reg(ymm_src);
+            opnd_t ymm_bit_pattern_opnd = opnd_create_reg(ymm_bit_pattern);
+            opnd_t ymm_mask_opnd = opnd_create_reg(ymm_mask);
+            opnd_t xmm_mask_opnd = opnd_create_reg(xmm_mask);
+            opnd_t ymm_final_dst_opnd = opnd_create_reg(ymm_final_dst);
+
+            instr_t *i1 = INSTR_CREATE_push(dcontext, scratch_opnd_gpr64);
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // spill_dst_reg -> tls (save scratch)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            // If Merge: tls(dst_reg) -> spill_dst_reg (load old value). If Zero: this load is unnecessary but
+            // harmless/simplifies logic. Actually for Zero mask we don't need old value. But let's load it for
+            // uniformity unless optimize.
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+
+            instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, DR_REG_EAX, TLS_K_idx_SLOT(k_idx), OPSZ_4);
+            instr_t *i6 = INSTR_CREATE_test(dcontext, scratch_opnd_gpr32, scratch_opnd_gpr32);
+
+            instr_t *i7 = NULL_INSTR;
+            if (!is_zero_mask) {
+                // If Merge and mask=0, preserve old value (which is in spill_dst_reg), write back done at end.
+                // Wait, if we jump SKIP_LOAD, we must ensure spill_dst_reg contains old value. i4 loaded it.
+                // But we must write it back.
+                // Optimization: Just jump to SKIP_LOAD, and at SKIP_LOAD we write spill_dst_reg -> tls(dst).
+                i7 = INSTR_CREATE_jcc(dcontext, OP_jz, opnd_create_instr(SKIP_LOAD));
+            }
+
+            instr_t *i8 = INSTR_CREATE_cmp(dcontext, opnd_create_reg(DR_REG_EAX), opnd_create_immed_int(0xff, OPSZ_4));
+            instr_t *i9 = INSTR_CREATE_jcc(dcontext, OP_je, opnd_create_instr(FULL_LOAD));
+
+            instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_bit_pattern,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_bit_pattern)), OPSZ_32);
+            instr_t *i11 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_mask, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_mask)), OPSZ_32);
+            instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_final_dst,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_final_dst)), OPSZ_32);
+            instr_t *i_spill_else = is_zero_mask ? i_spill_else_src : NULL_INSTR;
+
+            // 32-bit pattern
+            instr_t *i13 =
+                INSTR_CREATE_sub(dcontext, opnd_create_reg(DR_REG_RSP), opnd_create_immed_int(SIZE_OF_YMM, OPSZ_4));
+            // ... (Same pattern gen as case 1) ...
+            instr_t *i14 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000000200000001ULL, OPSZ_8));
+            instr_t *i15 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 0, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            instr_t *i16 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000000800000004ULL, OPSZ_8));
+            instr_t *i17 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 8, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            instr_t *i18 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000002000000010ULL, OPSZ_8));
+            instr_t *i19 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 16, OPSZ_8),
+                                               scratch_opnd_gpr64);
+            instr_t *i20 = INSTR_CREATE_mov_imm(dcontext, scratch_opnd_gpr64,
+                                                opnd_create_immed_int(0x0000008000000040ULL, OPSZ_8));
+            instr_t *i21 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 24, OPSZ_8),
+                                               scratch_opnd_gpr64);
+
+            instr_t *i22 = INSTR_CREATE_vmovdqu(dcontext, ymm_bit_pattern_opnd,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, 0, OPSZ_32));
+            instr_t *i23 =
+                INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), opnd_create_immed_int(SIZE_OF_YMM, OPSZ_4));
+
+            instr_t *i_prep_else = is_zero_mask ? i_prepare_else_src : NULL_INSTR;
+
+            instr_t *i24 = RESTORE_FROM_SIZED_TLS(dcontext, DR_REG_EAX, TLS_K_idx_SLOT(k_idx), OPSZ_4);
+            instr_t *i25 = INSTR_CREATE_vmovd(dcontext, xmm_mask_opnd, scratch_opnd_gpr32);
+            instr_t *i26 = INSTR_CREATE_vpbroadcastd(dcontext, ymm_mask_opnd, xmm_mask_opnd);
+            instr_t *i27 = INSTR_CREATE_vpand(dcontext, ymm_mask_opnd, ymm_mask_opnd, ymm_bit_pattern_opnd);
+            instr_t *i28 = INSTR_CREATE_vpcmpeqd(dcontext, ymm_mask_opnd, ymm_mask_opnd, ymm_bit_pattern_opnd);
+
+            // Blend: else=spill_dst_reg(old) OR ymm_else_src(0)
+            opnd_t else_opnd = is_zero_mask ? ymm_else_src_opnd : spill_dst_opnd;
+            instr_t *i29 = INSTR_CREATE_vpblendvb(dcontext, ymm_final_dst_opnd, else_opnd, ymm_src_opnd, ymm_mask_opnd);
+
+            instr_t *i30 = INSTR_CREATE_vmovdqu(dcontext, spill_dst_opnd, ymm_final_dst_opnd);
+
+            instr_t *i31 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_bit_pattern,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_bit_pattern)), OPSZ_32);
+            instr_t *i32 =
+                RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_mask, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_mask)), OPSZ_32);
+            instr_t *i33 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_final_dst,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_final_dst)), OPSZ_32);
+            instr_t *i_rst_else = is_zero_mask ? i_restore_else_src : NULL_INSTR;
+
+            instr_t *i34 = INSTR_CREATE_jmp(dcontext, opnd_create_instr(SKIP_LOAD));
+
+            // FULL_LOAD:
+            instr_t *i35 = INSTR_CREATE_vmovdqu(dcontext, spill_dst_opnd, ymm_src_opnd);
+
+            // SKIP_LOAD:
+            // Write result back to memory
+            instr_t *i36 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // Restore scratch
+            instr_t *i37 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
+            instr_t *i38 = INSTR_CREATE_popf(dcontext);
+            instr_t *i39 = INSTR_CREATE_pop(dcontext, scratch_opnd_gpr64);
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 41, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i_spill_else,
+                                         i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i_prep_else, i24, i25,
+                                         i26, i27, i28, i29, i30, i31, i32, i33, i_rst_else, i34, FULL_LOAD, i35,
+                                         SKIP_LOAD, i36, i37, i38, i39);
+#endif
+            instrlist_concat_next_instr(ilist, 41, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i_spill_else, i13,
+                                        i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i_prep_else, i24, i25, i26,
+                                        i27, i28, i29, i30, i31, i32, i33, i_rst_else, i34, FULL_LOAD, i35, SKIP_LOAD,
+                                        i36, i37, i38, i39);
+            return i1;
+        } break;
+        default: {
+            REWRITE_ERROR(STD_ERRF, "vmovdqu32_ymm_reg2reg_gen not support pattern");
+        }
+            return NULL_INSTR;
+        }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
 vmovdqu32_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF,
-                 "vmovdqu_zmm_reg2reg_gen: src_reg_lower{ymm%d}, src_reg_upper{ymm%d}, dst_reg_lower{ymm%d}, "
-                 "dst_reg_upper{ymm%d}",
-                 src_reg_lower - DR_REG_YMM0, src_reg_upper - DR_REG_YMM0, dst_reg_lower - DR_REG_YMM0,
-                 dst_reg_upper - DR_REG_YMM0);
-#endif
-
-    instr_t *new_instr1 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_lower), opnd_create_reg(src_reg_lower));
-    instr_t *new_instr2 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_upper), opnd_create_reg(src_reg_upper));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr1;
+
+    const uint src_need_spill_flag = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_ZMM(dst_reg) ? 2 : 0;
+    const uint need_spill_flag = src_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { // no spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_upper = find_available_spill_ymm_avoiding(src_lower, dst_lower, DR_REG_NULL);
+
+        opnd_t op_src_lower = opnd_create_reg(src_lower);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_upper -> tls(src_upper)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+
+        // vmovdqu op_src_lower -> op_dst_lower
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_lower);
+        // tls(src high 256bits) -> op_src_upper
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // op_src_upper -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_upper) -> src_upper
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { // src need spill
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_spill_reg = find_one_available_spill_ymm(dst_lower);
+
+        opnd_t op_src_spill = opnd_create_reg(src_spill_reg);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_spill -> tls(src_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+        // tls(src lower 256bits) -> src_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_spill -> dst_lower
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_spill);
+
+        // tls(src high 256bits) -> src_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // src_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_spill) -> src_spill
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    case 2: { // dst need spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_spill_reg = find_one_available_spill_ymm(src_lower);
+
+        // dst_spill -> tls(dst_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // src_lower -> tls(dst lower 256bits)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> dst_spill
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // dst_spill -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill) -> dst_spill
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 3: { // both need spill
+        reg_id_t ymm_spill = YMM_SPILL_SLOT0;
+
+        // ymm_spill -> tls(ymm_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+        // tls(src lower 256bits) -> ymm_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // ymm_spill -> tls(dst lower 256bits
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> ymm_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // ymm_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill) -> ymm_spill
+        instr_t *i6 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    default: {
+        REWRITE_ERROR(STD_ERRF, "vmovdqu64_zmm_reg2reg_gen not support pattern");
+    }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -18485,49 +21781,17 @@ instr_t *
 vmovdqu32_zmm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, opnd_t dst_opnd,
                            reg_id_t mask_reg)
 {
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
+    // vmovdqu32 %zmm0 -> 0x40(%rsp)[64byte]
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
     int disp = opnd_get_disp(dst_opnd);
-    // int opsz = opnd_get_size(dst_opnd);
     reg_id_t dst_base_reg = opnd_get_base(dst_opnd);
     reg_id_t dst_index_reg = opnd_get_index(dst_opnd);
     int scale = opnd_get_scale(dst_opnd);
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND)
-            return NULL_INSTR;
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
 
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF, "vmovdqu_zmm_reg2disp_gen: src_reg_lower{ymm%d}, src_reg_upper{ymm%d}",
-                 src_reg_lower - DR_REG_YMM0, src_reg_upper - DR_REG_YMM0);
-#endif
-
-    instr_t *new_instr1 = instr_create_1dst_1src(
-        dcontext, OP_vmovdqu, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32),
-        opnd_create_reg(src_reg_lower));
-    instr_t *new_instr2 = instr_create_1dst_1src(
-        dcontext, OP_vmovdqu, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
-        opnd_create_reg(src_reg_upper));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr2;
-}
-
-instr_t *
-vmovdqu32_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
-                              opnd_t dst_opnd, reg_id_t mask_reg)
-{
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    const uint src_need_spill = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
-    switch (src_need_spill) {
+    const uint dst_need_spill = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    switch (dst_need_spill) {
     case 0: { /* no spill */
         reg_id_t src_reg_lower = ZMM_TO_YMM(src_reg);
         reg_id_t src_reg_upper = find_one_available_spill_ymm(src_reg_lower);
@@ -18538,17 +21802,18 @@ vmovdqu32_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
         // src_reg_upper -> tls(src_reg_upper)
         instr_t *i1 =
             SAVE_SIMD_TO_SIZED_TLS(dcontext, src_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg_upper)), OPSZ_32);
-        // tls(src_lower) -> src_reg_lower
-        instr_t *i2 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
         // tls(src_upper) -> src_reg_upper
-        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // vmovdqu src_reg_lower -> dst_low
-        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, dst_opnd, op_src_reg_lower);
-        // vmovdqu src_reg_upper -> dst_high
+        // tls(src_lower) -> src_reg_lower
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_reg_lower -> dst_opnd_lower
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_src_reg_lower);
+        // vmovdqu src_reg_upper -> dst_opnd_upper
         instr_t *i5 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_rel_addr((void *)((char *)opnd_get_addr(dst_opnd) + SIZE_OF_YMM), OPSZ_32),
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
             op_src_reg_upper);
         // tls(src_reg_upper) -> src_reg_upper
         instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
@@ -18559,7 +21824,7 @@ vmovdqu32_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
         instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
         return i1;
     } break;
-    case 1: { /* src need spill */
+    case 1: { /* dst need spill */
         reg_id_t spill_src_reg = find_one_available_spill_ymm(DR_REG_NULL);
         reg_id_t spill_src_reg_upper = find_one_available_spill_ymm(spill_src_reg);
 
@@ -18578,11 +21843,12 @@ vmovdqu32_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
         // tls(src_upper) -> spill_src_reg_upper
         instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg_upper,
                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // vmovdqu spill_src_reg -> dst_low
-        instr_t *i5 = INSTR_CREATE_vmovdqu(dcontext, dst_opnd, op_spill_src_reg);
-        // vmovdqu spill_src_reg_upper -> dst_high
+        // vmovdqu spill_src_reg -> dst_opnd_lower
+        instr_t *i5 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_spill_src_reg);
+        // vmovdqu spill_src_reg_upper -> dst_opnd_upper
         instr_t *i6 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_rel_addr((void *)((char *)opnd_get_addr(dst_opnd) + SIZE_OF_YMM), OPSZ_32),
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
             op_spill_src_reg_upper);
         // tls(spill_src_reg) -> spill_src_reg
         instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
@@ -18597,6 +21863,16 @@ vmovdqu32_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t 
         return i1;
     } break;
     }
+    return NULL_INSTR;
+}
+
+instr_t *
+vmovdqu32_zmm_reg2reladdr_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
+                              opnd_t dst_opnd, reg_id_t mask_reg)
+{
+#ifdef DEBUG
+    REWRITE_ERROR(STD_ERRF, "zmm reg->rel_addr not support");
+#endif
     return NULL_INSTR;
 }
 
@@ -18718,39 +21994,77 @@ instr_t *
 vmovdqu32_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, reg_id_t dst_reg,
                            reg_id_t mask_reg)
 {
-    reg_id_t src_base_reg = opnd_get_base(src_opnd); // src_reg is now DR_REG_RSP
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src_base_reg = opnd_get_base(src_opnd);
     reg_id_t src_index_reg = opnd_get_index(src_opnd);
     int scale = opnd_get_scale(src_opnd);
     int disp = opnd_get_disp(src_opnd);
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR;
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
+
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: { /* no spill */
+        reg_id_t dst_spill_high_reg = find_one_available_spill_ymm(ZMM_TO_YMM(dst_reg));
+        opnd_t op_dst_spill_high = opnd_create_reg(dst_spill_high_reg);
+        opnd_t op_dst_low = opnd_create_reg(ZMM_TO_YMM(dst_reg));
+
+        // dst_spill_high_reg -> tls(dst_spill_high_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_low_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_low,
+                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_high_reg
+        instr_t *i3 = INSTR_CREATE_vmovdqu(
+            dcontext, op_dst_spill_high,
+            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
+        // dst_spill_high_reg -> tls(dst_reg high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill_high_reg) -> dst_spill_high_reg
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { /* dst need spill */
+        reg_id_t dst_spill_reg = YMM_SPILL_SLOT0;
+        opnd_t op_dst_spill = opnd_create_reg(dst_spill_reg);
+
+        // dst_spill_reg -> tls(dst_spill_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_spill,
+                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg low 256bits)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_reg
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, op_dst_spill,
+            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill_reg) -> dst_spill_reg
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vmovdqu32_zmm_disp2reg_gen not support");
     }
 
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF, "vmovdqu_zmm_disp2reg_gen: dst_reg_lower{ymm%d}, dst_reg_upper{ymm%d}",
-                 dst_reg_lower - DR_REG_YMM0, dst_reg_upper - DR_REG_YMM0);
-#endif
-
-    instr_t *new_instr1 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_lower),
-                               opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
-    instr_t *new_instr2 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_upper),
-                               opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr2;
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -20539,44 +23853,130 @@ instr_t *
 vmovdqu64_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
 
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF,
-                 "vmovdqu_zmm_reg2reg_gen: src_reg_lower{ymm%d}, src_reg_upper{ymm%d}, dst_reg_lower{ymm%d}, "
-                 "dst_reg_upper{ymm%d}",
-                 src_reg_lower - DR_REG_YMM0, src_reg_upper - DR_REG_YMM0, dst_reg_lower - DR_REG_YMM0,
-                 dst_reg_upper - DR_REG_YMM0);
-#endif
-
-    instr_t *new_instr1 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_lower), opnd_create_reg(src_reg_lower));
-    instr_t *new_instr2 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_upper), opnd_create_reg(src_reg_upper));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr1;
+
+    const uint src_need_spill_flag = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_ZMM(dst_reg) ? 2 : 0;
+    const uint need_spill_flag = src_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { // no spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_upper = find_available_spill_ymm_avoiding(src_lower, dst_lower, DR_REG_NULL);
+
+        opnd_t op_src_lower = opnd_create_reg(src_lower);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_upper -> tls(src_upper)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+
+        // vmovdqu op_src_lower -> op_dst_lower
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_lower);
+        // tls(src high 256bits) -> op_src_upper
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // op_src_upper -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_upper) -> src_upper
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { // src need spill
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_spill_reg = find_one_available_spill_ymm(dst_lower);
+
+        opnd_t op_src_spill = opnd_create_reg(src_spill_reg);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_spill -> tls(src_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+        // tls(src lower 256bits) -> src_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_spill -> dst_lower
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_spill);
+
+        // tls(src high 256bits) -> src_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // src_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_spill) -> src_spill
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    case 2: { // dst need spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_spill_reg = find_one_available_spill_ymm(src_lower);
+
+        // dst_spill -> tls(dst_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // src_lower -> tls(dst lower 256bits)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> dst_spill
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // dst_spill -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill) -> dst_spill
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 3: { // both need spill
+        reg_id_t ymm_spill = YMM_SPILL_SLOT0;
+
+        // ymm_spill -> tls(ymm_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+        // tls(src lower 256bits) -> ymm_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // ymm_spill -> tls(dst lower 256bits
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> ymm_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // ymm_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill) -> ymm_spill
+        instr_t *i6 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    default: {
+        REWRITE_ERROR(STD_ERRF, "vmovdqu64_zmm_reg2reg_gen not support pattern");
+    }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -21265,23 +24665,20 @@ vmovdqu64_zmm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
         // tls(src_upper) -> src_reg_upper
         instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // tls(src_lower) -> src_reg_lower
-        instr_t *i3 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
         // vmovdqu src_reg_lower -> dst_opnd_lower
-        instr_t *i4 = INSTR_CREATE_vmovdqu(
+        instr_t *i3 = INSTR_CREATE_vmovdqu(
             dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_src_reg_lower);
         // vmovdqu src_reg_upper -> dst_opnd_upper
-        instr_t *i5 = INSTR_CREATE_vmovdqu(
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
             dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
             op_src_reg_upper);
         // tls(src_reg_upper) -> src_reg_upper
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg_upper)), OPSZ_32);
 #ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
 #endif
-        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
         return i1;
     } break;
     case 1: { /* dst need spill */
@@ -22120,88 +25517,76 @@ instr_t *
 vmovdqu64_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, reg_id_t dst_reg,
                            reg_id_t mask_reg)
 {
-    // vmovdqa64 {%k0} 0x00000140(%rsp)[64byte] -> %zmm1
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
 
-    reg_id_t src_base_reg = opnd_get_base(src_opnd); // src_reg is now DR_REG_RSP
+    reg_id_t src_base_reg = opnd_get_base(src_opnd);
     reg_id_t src_index_reg = opnd_get_index(src_opnd);
     int scale = opnd_get_scale(src_opnd);
     int disp = opnd_get_disp(src_opnd);
 
     const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+
     switch (dst_need_spill) {
     case 0: { /* no spill */
-        reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
-        reg_id_t dst_reg_upper = find_one_available_spill_ymm(dst_reg_lower);
+        reg_id_t dst_spill_high_reg = find_one_available_spill_ymm(ZMM_TO_YMM(dst_reg));
+        opnd_t op_dst_spill_high = opnd_create_reg(dst_spill_high_reg);
+        opnd_t op_dst_low = opnd_create_reg(ZMM_TO_YMM(dst_reg));
 
-        opnd_t op_dst_reg_lower = opnd_create_reg(dst_reg_lower);
-        opnd_t op_dst_reg_upper = opnd_create_reg(dst_reg_upper);
-
-        // dst_reg_upper -> tls(dst_reg_upper)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
-        // vmodqu src_low -> dst_reg_lower
-        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_reg_lower,
+        // dst_spill_high_reg -> tls(dst_spill_high_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_low_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_low,
                                            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
-        // vmodqu src_high -> dst_reg_upper
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_high_reg
         instr_t *i3 = INSTR_CREATE_vmovdqu(
-            dcontext, op_dst_reg_upper,
+            dcontext, op_dst_spill_high,
             opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
-        // dst_reg_lower -> tls(dst_lower)
-        instr_t *i4 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-        // dst_reg_upper -> tls(dst_upper)
-        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+        // dst_spill_high_reg -> tls(dst_reg high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // tls(dst_reg_upper) -> dst_reg_upper
-        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+        // tls(dst_spill_high_reg) -> dst_spill_high_reg
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { /* dst need spill */
+        reg_id_t dst_spill_reg = YMM_SPILL_SLOT0;
+        opnd_t op_dst_spill = opnd_create_reg(dst_spill_reg);
+
+        // dst_spill_reg -> tls(dst_spill_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_spill,
+                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg low 256bits)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_reg
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, op_dst_spill,
+            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill_reg) -> dst_spill_reg
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
 #endif
         instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
         return i1;
     } break;
-    case 1: { /* dst need spill */
-        reg_id_t spill_dst_reg = find_one_available_spill_ymm(DR_REG_NULL);
-        reg_id_t spill_dst_reg_upper = find_one_available_spill_ymm(spill_dst_reg);
-
-        opnd_t op_spill_dst_reg = opnd_create_reg(spill_dst_reg);
-        opnd_t op_spill_dst_reg_upper = opnd_create_reg(spill_dst_reg_upper);
-
-        // spill_dst_reg -> tls(spill_dst_reg)
-        instr_t *i1 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-        // spill_dst_reg_upper -> tls(spill_dst_reg_upper)
-        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg_upper)), OPSZ_32);
-        // vmovdqu src_low -> spill_dst_reg
-        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst_reg,
-                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
-        // vmovdqu src_high -> spill_dst_reg_upper
-        instr_t *i4 = INSTR_CREATE_vmovdqu(
-            dcontext, op_spill_dst_reg_upper,
-            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
-        // spill_dst_reg -> tls(dst_lower)
-        instr_t *i5 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-        // spill_dst_reg_upper -> tls(dst_upper)
-        instr_t *i6 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg_upper,
-                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
-        // tls(spill_dst_reg) -> spill_dst_reg
-        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg)), OPSZ_32);
-        // tls(spill_dst_reg_upper) -> spill_dst_reg_upper
-        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg_upper,
-                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_reg_upper)), OPSZ_32);
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
-#endif
-        instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
-        return i1;
-    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vmovdqu64_zmm_disp2reg_gen not support");
     }
+
     return NULL_INSTR;
 }
 
@@ -22304,37 +25689,10 @@ instr_t *
 vmovdqu64_zmm_absaddr2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd,
                               reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    reg_id_t dst_reg_lower = ZMM_TO_YMM(dst_reg);
-    reg_id_t dst_reg_upper = find_one_available_spill_ymm(dst_reg_lower);
-
-    opnd_t op_dst_reg_lower = opnd_create_reg(dst_reg_lower);
-    opnd_t op_dst_reg_upper = opnd_create_reg(dst_reg_upper);
-
-    // dst_reg_upper -> tls(dst_reg_upper)
-    instr_t *i1 =
-        SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
-    // vmovdqu src_opnd_lower -> dst_reg_lower
-    instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_reg_lower, src_opnd);
-    // vmovdqu src_opnd_upper -> dst_reg_upper
-    instr_t *i3 =
-        INSTR_CREATE_vmovdqu(dcontext, op_dst_reg_upper,
-                             opnd_create_abs_addr((void *)((char *)opnd_get_addr(src_opnd) + SIZE_OF_YMM), OPSZ_32));
-    // dst_reg_lower -> tls(dst_reg)
-    instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
-    // dst_reg_upper -> tls(dst_reg + SIZE_OF_YMM)
-    instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
-                                         TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
-    // tls(dst_reg_upper) -> dst_reg_upper
-    instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
-                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
 #ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+    REWRITE_ERROR(STD_ERRF, "vmovdqu_zmm_absaddr2reg_gen not support");
 #endif
-    instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
-    return i1;
+    return NULL_INSTR;
 }
 
 /**
@@ -23703,36 +27061,129 @@ instr_t *
 vmovdqu8_zmm_reg2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, reg_id_t dst_reg,
                          reg_id_t mask_reg)
 {
-    dr_ymm_pair_t src_ymm_pair = { EMPTY, EMPTY };
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &src_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(src_reg), &src_ymm_pair);
-    }
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR; // means failed find unused ymm pair, abandon instr rewrite
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
-    }
-    reg_id_t src_reg_lower = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_lower);
-    reg_id_t src_reg_upper = TO_YMM_REG_ID_NUM(src_ymm_pair.ymm_upper);
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-
-    instr_t *new_instr1 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_lower), opnd_create_reg(src_reg_lower));
-    instr_t *new_instr2 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_upper), opnd_create_reg(src_reg_upper));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr1;
+
+    const uint src_need_spill_flag = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill_flag = NEED_SPILL_ZMM(dst_reg) ? 2 : 0;
+    const uint need_spill_flag = src_need_spill_flag | dst_need_spill_flag;
+
+    switch (need_spill_flag) {
+    case 0: { // no spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_upper = find_available_spill_ymm_avoiding(src_lower, dst_lower, DR_REG_NULL);
+
+        opnd_t op_src_lower = opnd_create_reg(src_lower);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_upper -> tls(src_upper)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+
+        // vmovdqu op_src_lower -> op_dst_lower
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_lower);
+        // tls(src high 256bits) -> op_src_upper
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // op_src_upper -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_upper,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_upper) -> src_upper
+        instr_t *i5 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { // src need spill
+        reg_id_t dst_lower = ZMM_TO_YMM(dst_reg);
+        reg_id_t src_spill_reg = find_one_available_spill_ymm(dst_lower);
+
+        opnd_t op_src_spill = opnd_create_reg(src_spill_reg);
+        opnd_t op_dst_lower = opnd_create_reg(dst_lower);
+
+        // src_spill -> tls(src_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+        // tls(src lower 256bits) -> src_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_spill -> dst_lower
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_dst_lower, op_src_spill);
+
+        // tls(src high 256bits) -> src_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // src_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_spill) -> src_spill
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    case 2: { // dst need spill
+        reg_id_t src_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t dst_spill_reg = find_one_available_spill_ymm(src_lower);
+
+        // dst_spill -> tls(dst_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // src_lower -> tls(dst lower 256bits)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> dst_spill
+        instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // dst_spill -> tls(dst high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill) -> dst_spill
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 3: { // both need spill
+        reg_id_t ymm_spill = YMM_SPILL_SLOT0;
+
+        // ymm_spill -> tls(ymm_spill)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+        // tls(src lower 256bits) -> ymm_spill
+        instr_t *i2 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // ymm_spill -> tls(dst lower 256bits
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // tls(src high 256bits) -> ymm_spill
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // ymm_spill -> tls(dst high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill) -> ymm_spill
+        instr_t *i6 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    default: {
+        REWRITE_ERROR(STD_ERRF, "vmovdqu64_zmm_reg2reg_gen not support pattern");
+    }
+    }
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -23856,6 +27307,87 @@ instr_t *
 vmovdqu8_zmm_reg2disp_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg, opnd_t dst_opnd,
                           reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    int disp = opnd_get_disp(dst_opnd);
+    reg_id_t dst_base_reg = opnd_get_base(dst_opnd);
+    reg_id_t dst_index_reg = opnd_get_index(dst_opnd);
+    int scale = opnd_get_scale(dst_opnd);
+
+    const uint dst_need_spill = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    switch (dst_need_spill) {
+    case 0: { /* no spill */
+        reg_id_t src_reg_lower = ZMM_TO_YMM(src_reg);
+        reg_id_t src_reg_upper = find_one_available_spill_ymm(src_reg_lower);
+
+        opnd_t op_src_reg_lower = opnd_create_reg(src_reg_lower);
+        opnd_t op_src_reg_upper = opnd_create_reg(src_reg_upper);
+
+        // src_reg_upper -> tls(src_reg_upper)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, src_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg_upper)), OPSZ_32);
+        // tls(src_upper) -> src_reg_upper
+        instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(src_lower) -> src_reg_lower
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu src_reg_lower -> dst_opnd_lower
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_src_reg_lower);
+        // vmovdqu src_reg_upper -> dst_opnd_upper
+        instr_t *i5 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
+            op_src_reg_upper);
+        // tls(src_reg_upper) -> src_reg_upper
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    case 1: { /* dst need spill */
+        reg_id_t spill_src_reg = find_one_available_spill_ymm(DR_REG_NULL);
+        reg_id_t spill_src_reg_upper = find_one_available_spill_ymm(spill_src_reg);
+
+        opnd_t op_spill_src_reg = opnd_create_reg(spill_src_reg);
+        opnd_t op_spill_src_reg_upper = opnd_create_reg(spill_src_reg_upper);
+
+        // spill_src_reg -> tls(spill_src_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg)), OPSZ_32);
+        // spill_src_reg_upper -> tls(spill_src_reg_upper)
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg_upper)), OPSZ_32);
+        // tls(src_lower) -> spill_src_reg
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // tls(src_upper) -> spill_src_reg_upper
+        instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu spill_src_reg -> dst_opnd_lower
+        instr_t *i5 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp, OPSZ_32), op_spill_src_reg);
+        // vmovdqu spill_src_reg_upper -> dst_opnd_upper
+        instr_t *i6 = INSTR_CREATE_vmovdqu(
+            dcontext, opnd_create_base_disp(dst_base_reg, dst_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32),
+            op_spill_src_reg_upper);
+        // tls(spill_src_reg) -> spill_src_reg
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg)), OPSZ_32);
+        // tls(spill_src_reg_upper) -> spill_src_reg_upper
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+        instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+        return i1;
+    } break;
+    }
     return NULL_INSTR;
 }
 
@@ -24009,39 +27541,76 @@ instr_t *
 vmovdqu8_zmm_disp2reg_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, opnd_t src_opnd, reg_id_t dst_reg,
                           reg_id_t mask_reg)
 {
-    reg_id_t src_base_reg = opnd_get_base(src_opnd); // src_reg is now DR_REG_RSP
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src_base_reg = opnd_get_base(src_opnd);
     reg_id_t src_index_reg = opnd_get_index(src_opnd);
     int scale = opnd_get_scale(src_opnd);
     int disp = opnd_get_disp(src_opnd);
-    dr_ymm_pair_t dst_ymm_pair = { EMPTY, EMPTY };
-    if (get_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair) == NOT_GET) {
-        if (find_and_set_unused_ymm_pair(dcontext, &dst_ymm_pair) == NOT_FIND) {
-            return NULL_INSTR;
-        }
-        add_zmm_to_ymm_pair_mapping(TO_ZMM_REG_INDEX(dst_reg), &dst_ymm_pair);
+
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 1 : 0;
+
+    switch (dst_need_spill) {
+    case 0: { /* no spill */
+        reg_id_t dst_spill_high_reg = find_one_available_spill_ymm(ZMM_TO_YMM(dst_reg));
+        opnd_t op_dst_spill_high = opnd_create_reg(dst_spill_high_reg);
+        opnd_t op_dst_low = opnd_create_reg(ZMM_TO_YMM(dst_reg));
+
+        // dst_spill_high_reg -> tls(dst_spill_high_reg)
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_low_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_low,
+                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_high_reg
+        instr_t *i3 = INSTR_CREATE_vmovdqu(
+            dcontext, op_dst_spill_high,
+            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
+        // dst_spill_high_reg -> tls(dst_reg high 256bits)
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill_high_reg) -> dst_spill_high_reg
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_high_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_high_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 5, i1, i2, i3, i4, i5);
+#endif
+        instrlist_concat_next_instr(ilist, 5, i1, i2, i3, i4, i5);
+        return i1;
+    } break;
+    case 1: { /* dst need spill */
+        reg_id_t dst_spill_reg = YMM_SPILL_SLOT0;
+        opnd_t op_dst_spill = opnd_create_reg(dst_spill_reg);
+
+        // dst_spill_reg -> tls(dst_spill_reg)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+        // vmovdqu src_opnd(32bytes) -> dst_spill_reg
+        instr_t *i2 = INSTR_CREATE_vmovdqu(dcontext, op_dst_spill,
+                                           opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg low 256bits)
+        instr_t *i3 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        // vmovdqu src_opnd(high 32bytes) -> dst_spill_reg
+        instr_t *i4 = INSTR_CREATE_vmovdqu(
+            dcontext, op_dst_spill,
+            opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
+        // dst_spill_reg -> tls(dst_reg high 256bits)
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_spill_reg,
+                                             TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(dst_spill_reg) -> dst_spill_reg
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_spill_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_spill_reg)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 6, i1, i2, i3, i4, i5, i6);
+#endif
+        instrlist_concat_next_instr(ilist, 6, i1, i2, i3, i4, i5, i6);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vmovdqu8_zmm_disp2reg_gen not support");
     }
-
-    reg_id_t dst_reg_lower = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_lower);
-    reg_id_t dst_reg_upper = TO_YMM_REG_ID_NUM(dst_ymm_pair.ymm_upper);
-
-#ifdef DEBUG
-    REWRITE_INFO(STD_OUTF, "vmovdqu8_zmm_disp2reg_gen: dst_reg_lower{ymm%d}, dst_reg_upper{ymm%d}",
-                 dst_reg_lower - DR_REG_YMM0, dst_reg_upper - DR_REG_YMM0);
-#endif
-
-    instr_t *new_instr1 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_lower),
-                               opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp, OPSZ_32));
-    instr_t *new_instr2 =
-        instr_create_1dst_1src(dcontext, OP_vmovdqu, opnd_create_reg(dst_reg_upper),
-                               opnd_create_base_disp(src_base_reg, src_index_reg, scale, disp + SIZE_OF_YMM, OPSZ_32));
-#ifdef DEBUG
-    print_rewrite_variadic_instr(dcontext, 2, new_instr1, new_instr2);
-#endif
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-    new_instr1->next = new_instr2;
-    return new_instr1;
+    return NULL_INSTR;
 }
 
 instr_t *
@@ -26085,9 +29654,9 @@ rw_func_vpcmpd_EQ_ymm_ymm(dcontext_t *dcontext, instrlist_t *ilist, instr_t *ins
             instr_t *i23 = INSTR_CREATE_mov_ld(dcontext, opnd_create_reg(DR_REG_R14D),
                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_RBX, 4, SIZE_OF_YMM, OPSZ_4));
 
-        // cmp %r14d, %r13d                 | compare src_reg1[j] with src_reg2[j]
-        instr_t *i24 = INSTR_CREATE_cmp(dcontext, opnd_create_reg(DR_REG_R13D),
-                                        opnd_create_reg(DR_REG_R14D));
+            // cmp %r14d, %r13d                 | compare src_reg1[j] with src_reg2[j]
+            instr_t *i24 = INSTR_CREATE_cmp(dcontext, opnd_create_reg(DR_REG_R13D),
+                                            opnd_create_reg(DR_REG_R14D)); // TODO: if result bit flip, change this
 
             // je .MatchEq                      | if equal, set bit j in output mask
             instr_t *i25 = INSTR_CREATE_jcc(dcontext, OP_je, opnd_create_instr(MATCH_EQ));
@@ -27575,6 +31144,7 @@ rw_func_vpcmpd_LE_ymm_ymm(dcontext_t *dcontext, instrlist_t *ilist, instr_t *ins
         return i1;
     } break;
     case 1: { // only src1 need spill
+        // TODO:
     } break;
     default: return NULL_INSTR;
     }
@@ -27909,6 +31479,7 @@ rw_func_vpcmpd_LE_ymm_m256(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
         }
     } break;
     case 1: { // only src1 need spill
+        // TODO:
     } break;
     default: return NULL_INSTR;
     }
@@ -29052,6 +32623,7 @@ rw_func_vpcmpd_NLE_ymm_m256(dcontext_t *dcontext, instrlist_t *ilist, instr_t *i
         return i1;
     } break;
     case 1: { // only src1 need spill
+        // TODO:
     } break;
     default: return NULL_INSTR;
     }
@@ -30079,6 +33651,21 @@ rw_func_vpcmpud_NLE_ymm_ymm(dcontext_t *dcontext, instrlist_t *ilist, instr_t *i
             return i1;
         }
     } break;
+    case 1: { // only src1 need spill
+        // TODO: implement spill cases
+        REWRITE_ERROR(STD_ERRF, "vpcmpud NLE ymm and ymm pattern src1 spill not implemented");
+        return NULL_INSTR;
+    } break;
+    case 2: { // only src2 need spill
+        // TODO: implement spill cases
+        REWRITE_ERROR(STD_ERRF, "vpcmpud NLE ymm and ymm pattern src2 spill not implemented");
+        return NULL_INSTR;
+    } break;
+    case 3: { // both src1 and src2 need spill
+        // TODO: implement spill cases
+        REWRITE_ERROR(STD_ERRF, "vpcmpud NLE ymm and ymm pattern both spill not implemented");
+        return NULL_INSTR;
+    } break;
     default: REWRITE_ERROR(STD_ERRF, "vpcmpud NLE ymm and ymm pattern not support"); return NULL_INSTR;
     }
     return NULL_INSTR;
@@ -30564,7 +34151,7 @@ rw_func_vpcmpw_NEQ_ymm_ymm(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         // cmp %r14d, %r13d                 | compare src_reg1[j] with src_reg2[j]
         instr_t *i24 = INSTR_CREATE_cmp(dcontext, opnd_create_reg(DR_REG_R13D),
-                                        opnd_create_reg(DR_REG_R14D)); 
+                                        opnd_create_reg(DR_REG_R14D)); // TODO: if result bit flip, change this
 
         // jne .MatchNE                     | if equal, set bit j in output mask
         instr_t *i25 = INSTR_CREATE_jcc(dcontext, OP_jne, opnd_create_instr(MATCH_NE));
@@ -30968,6 +34555,7 @@ vpermi2q_k_m32_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     }
+    // TODO: writemask-merge/zero handling.
     return NULL_INSTR;
 }
 
@@ -31115,6 +34703,7 @@ vpermi2q_k_ymm_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
         return i1; /* First instr in new sequence. */
     }
 
+    // TODO: writemask-merge/zero handling.
     return NULL_INSTR;
 }
 
@@ -31355,6 +34944,7 @@ vpermi2w_k_m32_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 {
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
+
     if (mask_reg == DR_REG_K0) {
 
         enum { REDZONE = 128, Y = SIZE_OF_YMM };         // Y==32
@@ -31486,13 +35076,1059 @@ vpermi2w_k_m32_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     }
+    // TODO: writemask-merge/zero handling.
     return NULL_INSTR;
 }
 
 instr_t *
-vpermi2w_k_xmm_xmm_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_idx_reg,
-                           reg_id_t src2_data_reg, reg_id_t dst_data_reg, reg_id_t mask_reg)
+vpermi2w_k_xmm_xmm_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_tbl_reg,
+                           reg_id_t src2_tbl_reg, reg_id_t dst_idx_reg, reg_id_t mask_reg)
 {
+    // e.g. vpermi2w {%k0} %xmm3 %xmm4 -> %xmm0
+    // AT&T format:  vpermi2w  %xmm4, %xmm3, %xmm0
+    // vpermi2w semantics: dst = table_lookup(dst_index, src1_table, src2_table)
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // if k0 no mask
+    if (mask_reg == DR_REG_K0) {
+
+        enum { REDZONE = 128, X = SIZE_OF_XMM };           // X==16
+        enum { SCRATCH = 4 * X /*idx, tbl1, tbl2, out*/ }; // 64
+        enum { SAVE = 8 /*rflags*/ + 8 * 3 /*rax,rdx,rcx*/ };
+        enum { SLACK_FOR_PUSH = 8 };
+        enum { FRAME = ((REDZONE + SCRATCH + SAVE + SLACK_FOR_PUSH + 15) & ~15) };
+
+        const int OFF_IDX = REDZONE + 0 * X;
+        const int OFF_TBL1 = REDZONE + 1 * X;
+        const int OFF_TBL2 = REDZONE + 2 * X;
+        const int OFF_DST = REDZONE + 3 * X;
+        const int OFF_RFLAGS = REDZONE + 4 * X;
+        const int OFF_RAX = OFF_RFLAGS + 8;
+        const int OFF_RDX = OFF_RAX + 8;
+        const int OFF_RCX = OFF_RDX + 8;
+
+        opnd_t op_rax = opnd_create_reg(DR_REG_RAX);
+        opnd_t op_rdx = opnd_create_reg(DR_REG_RDX);
+        opnd_t op_rcx = opnd_create_reg(DR_REG_RCX);
+        opnd_t op_eax = opnd_create_reg(DR_REG_EAX);
+        opnd_t op_ecx = opnd_create_reg(DR_REG_ECX);
+        opnd_t op_edx = opnd_create_reg(DR_REG_EDX);
+        opnd_t op_rsp = opnd_create_reg(DR_REG_RSP);
+
+        /* main logic of loop-based vpermi2w emulation */
+        instr_t *LOOP_LABEL = INSTR_CREATE_label(dcontext);
+        instr_t *FROM_TBL1_LABEL = INSTR_CREATE_label(dcontext);
+        instr_t *STORE_LABEL = INSTR_CREATE_label(dcontext);
+
+        /* pushf, save xflags to avoid pollution */
+
+        const uint src1_need_spill_flag = NEED_SPILL_XMM(src1_tbl_reg) ? 1 : 0;
+        const uint src2_need_spill_flag = NEED_SPILL_XMM(src2_tbl_reg) ? 2 : 0;
+        const uint dst_need_spill_flag = NEED_SPILL_XMM(dst_idx_reg) ? 4 : 0;
+
+        const uint need_spill_flag = src1_need_spill_flag | src2_need_spill_flag | dst_need_spill_flag;
+
+        switch (need_spill_flag) {
+        case 0: {
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // vmovdqu %xmm0, (%rsp)           # [rsp+0]   ← index_array[0..7] from dst
+            instr_t *i6 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16),
+                                     opnd_create_reg(dst_idx_reg));
+            // vmovdqu %xmm3, 16(%rsp)         # [rsp+16]  ← table1_array[0..7] from src1
+            instr_t *i7 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16),
+                                     opnd_create_reg(src1_tbl_reg));
+            // vmovdqu %xmm4, 32(%rsp)         # [rsp+32]  ← table2_array[0..7] from src2
+            instr_t *i8 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16),
+                                     opnd_create_reg(src2_tbl_reg));
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2) - index from dst
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %xmm0
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(dst_idx_reg),
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 30, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                         i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 30, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                        i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30);
+
+            return i1;
+        } break;
+        case 1: { // src1 spill
+            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_tbl_reg, dst_idx_reg, DR_REG_NULL);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_tbl_reg)), OPSZ_16);
+
+            // vmovdqu %dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16),
+                                     opnd_create_reg(dst_idx_reg));
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16), op_spill_src1);
+            // vmovdqu %src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16),
+                                     opnd_create_reg(src2_tbl_reg));
+
+            // tls(spill_src1) -> spill_src1
+            instr_t *i8a = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(dst_idx_reg),
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 33, i1, i2, i3, i4, i5, i6a, i6b, i6, i7, i8, i8a, i9, i10, i11, i12,
+                                         i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28,
+                                         i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 33, i1, i2, i3, i4, i5, i6a, i6b, i6, i7, i8, i8a, i9, i10, i11, i12,
+                                        i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28,
+                                        i29, i30);
+
+            return i1;
+        } break;
+        case 2: { // src2 spill
+            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(src1_tbl_reg, dst_idx_reg, DR_REG_NULL);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+
+            // tls(src2) -> spill_src2
+            instr_t *i6b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_tbl_reg)), OPSZ_16);
+
+            // vmovdqu %dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16),
+                                     opnd_create_reg(dst_idx_reg));
+            // vmovdqu %src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16),
+                                     opnd_create_reg(src1_tbl_reg));
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16), op_spill_src2);
+
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8a = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(dst_idx_reg),
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 33, i1, i2, i3, i4, i5, i6a, i6b, i6, i7, i8, i8a, i9, i10, i11, i12,
+                                         i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28,
+                                         i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 33, i1, i2, i3, i4, i5, i6a, i6b, i6, i7, i8, i8a, i9, i10, i11, i12,
+                                        i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28,
+                                        i29, i30);
+
+            return i1;
+        } break;
+        case 3: { // src1 and src2 spill
+            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_tbl_reg, dst_idx_reg, DR_REG_NULL);
+            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(dst_idx_reg, spill_src1_reg, DR_REG_NULL);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_tbl_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_tbl_reg)), OPSZ_16);
+
+            // vmovdqu %dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16),
+                                     opnd_create_reg(dst_idx_reg));
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16), op_spill_src1);
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16), op_spill_src2);
+
+            // tls(spill_src1) -> spill_src1
+            instr_t *i8a = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(dst_idx_reg),
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 35, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i8a, i8b, i9,
+                                         i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                         i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 35, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i8a, i8b, i9,
+                                        i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                        i26, i27, i28, i29, i30);
+
+            return i1;
+        } break;
+        case 4: { // dst spill
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_tbl_reg, src2_tbl_reg, DR_REG_NULL);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(dst) -> spill_dst
+            instr_t *i6b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_dst);
+            // vmovdqu %src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16),
+                                     opnd_create_reg(src1_tbl_reg));
+            // vmovdqu %src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16),
+                                     opnd_create_reg(src2_tbl_reg));
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 34, i1, i2, i3, i4, i5, i6a, i6b, i6, i7, i8, i9, i10, i11, i12, i13,
+                                         i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i26a, i26b,
+                                         i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 34, i1, i2, i3, i4, i5, i6a, i6b, i6, i7, i8, i9, i10, i11, i12, i13,
+                                        i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i26a, i26b,
+                                        i27, i28, i29, i30);
+
+            return i1;
+        } break;
+        case 5: { // src1 and dst spill
+            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_tbl_reg, dst_idx_reg, DR_REG_NULL);
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src2_tbl_reg, spill_src1_reg, DR_REG_NULL);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_tbl_reg)), OPSZ_16);
+            // tls(dst) -> spill_dst
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_dst);
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16), op_spill_src1);
+            // vmovdqu %src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16),
+                                     opnd_create_reg(src2_tbl_reg));
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                         i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                         i26b, i26c, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                        i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                        i26b, i26c, i26, i27, i28, i29, i30);
+
+            return i1;
+        } break;
+        case 6: { // src2 and dst spill
+            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(src1_tbl_reg, dst_idx_reg, DR_REG_NULL);
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_tbl_reg, spill_src2_reg, DR_REG_NULL);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(src2) -> spill_src2
+            instr_t *i6c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_tbl_reg)), OPSZ_16);
+            // tls(dst) -> spill_dst
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_dst);
+            // vmovdqu %src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16),
+                                     opnd_create_reg(src1_tbl_reg));
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16), op_spill_src2);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                         i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                         i26b, i26c, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                        i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                        i26b, i26c, i26, i27, i28, i29, i30);
+
+            return i1;
+        } break;
+        case 7: { // src1, src2 and dst spill
+            reg_id_t spill_src1_reg =
+                find_available_spill_xmm_avoiding_variadic(3, src1_tbl_reg, src2_tbl_reg, dst_idx_reg);
+            reg_id_t spill_src2_reg =
+                find_available_spill_xmm_avoiding_variadic(4, src1_tbl_reg, src2_tbl_reg, dst_idx_reg, spill_src1_reg);
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding_variadic(
+                5, src1_tbl_reg, src2_tbl_reg, dst_idx_reg, spill_src1_reg, spill_src2_reg);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6c = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_tbl_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i6e = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_tbl_reg)), OPSZ_16);
+            // tls(dst) -> spill_dst
+            instr_t *i6f = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← index_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_dst);
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← table1_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL1, OPSZ_16), op_spill_src1);
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← table2_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_TBL2, OPSZ_16), op_spill_src2);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  (%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_tbl1                  # if bit3 is 0, jump to .Lfrom_tbl1
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_TBL1_LABEL));
+
+            /* fallthrough branch to select from table2 */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = table2_array[idx]
+            instr_t *i15 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL2, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from table1 label */
+            // .Lfrom_tbl1: instr_t *FROM_TBL1_LABEL
+            instr_t *i17 = FROM_TBL1_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  16(%rsp,%rax,2), %edx     # edx = table1_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_TBL1, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_idx_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i26c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 39, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6e, i6f, i6, i7, i8, i9,
+                                         i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                         i26a, i26b, i26c, i26d, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 39, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6e, i6f, i6, i7, i8, i9,
+                                        i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                        i26a, i26b, i26c, i26d, i26, i27, i28, i29, i30);
+
+            return i1;
+        } break;
+        default: {
+            REWRITE_INFO(STD_OUTF, "vpermi2w xmm and xmm pattern not support\n");
+        } break;
+        }
+    } else { // writemask, need to know merging mode or zero mode
+    }
     return NULL_INSTR;
 }
 
@@ -31892,6 +36528,7 @@ vpermt2q_k_ymm_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     } else { // writemask, need to know merging mode or zero mode
+        // TODO: impl this kind
     }
     return NULL_INSTR;
 }
@@ -32050,6 +36687,7 @@ vpermt2q_k_m32_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     } else { // writemask, need to know merging mode or zero mode
+        // TODO: impl this kind
     }
     return NULL_INSTR;
 }
@@ -32308,6 +36946,7 @@ vpermt2w_k_ymm_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     } else { // writemask, need to know merging mode or zero mode
+        // TODO: impl this kind
     }
     return NULL_INSTR;
 }
@@ -32471,6 +37110,7 @@ vpermt2w_k_m32_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     } else { // writemask, need to know merging mode or zero mode
+        // TODO: impl this kind
     }
     return NULL_INSTR;
 }
@@ -32863,7 +37503,132 @@ vpermt2w_k_xmm_xmm_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
             return i1;
         } break;
         case 3: { // src1 and src2 spill
-            REWRITE_ERROR(STD_OUTF, "not implemented\n");
+            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_data_reg, dst_data_reg, DR_REG_NULL);
+            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(dst_data_reg, spill_src1_reg, DR_REG_NULL);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_idx_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_data_reg)), OPSZ_16);
+
+            // vmovdqu %dst, (%rsp)           # [rsp+0]   ← data_array[0..7]
+            instr_t *i6 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA, OPSZ_16),
+                                     opnd_create_reg(dst_data_reg));
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← index_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_src1);
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← mem_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_MEM, OPSZ_16), op_spill_src2);
+
+            // tls(spill_src1) -> spill_src1
+            instr_t *i8a = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i8b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  16(%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp+16 + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_data                  # if bit3 is 0, jump to .Lfrom_data
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_DATA_LABEL));
+
+            /* fallthrough branch to select from mem_array */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = mem_array[idx]
+            instr_t *i15 =
+                INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_MEM, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from data label */
+            // .Lfrom_data: instr_t *FROM_DATA_LABEL
+            instr_t *i17 = FROM_DATA_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  (%rsp,%rax,2), %edx     # edx = data_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_DATA, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(dst_data_reg),
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 35, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i8a, i8b, i9,
+                                         i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                         i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 35, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i8a, i8b, i9,
+                                        i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                        i26, i27, i28, i29, i30);
+
+            return i1;
         } break;
         case 4: { // dst spill
             reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_idx_reg, src2_data_reg, DR_REG_NULL);
@@ -32987,19 +37752,417 @@ vpermt2w_k_xmm_xmm_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
             return i1;
         } break;
         case 5: { // src1 and dst spill
-            REWRITE_ERROR(STD_OUTF, "not implemented\n");
+            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_data_reg, dst_data_reg, DR_REG_NULL);
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src2_data_reg, spill_src1_reg, DR_REG_NULL);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_idx_reg)), OPSZ_16);
+            // tls(dst) -> spill_dst
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_data_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← data_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA, OPSZ_16), op_spill_dst);
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← index_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_src1);
+            // vmovdqu %src2, 32(%rsp)         # [rsp+32]  ← mem_array[0..7]
+            instr_t *i8 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_MEM, OPSZ_16),
+                                     opnd_create_reg(src2_data_reg));
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  16(%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp+16 + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_data                  # if bit3 is 0, jump to .Lfrom_data
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_DATA_LABEL));
+
+            /* fallthrough branch to select from mem_array */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = mem_array[idx]
+            instr_t *i15 =
+                INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_MEM, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from data label */
+            // .Lfrom_data: instr_t *FROM_DATA_LABEL
+            instr_t *i17 = FROM_DATA_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  (%rsp,%rax,2), %edx     # edx = data_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_DATA, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_data_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                         i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                         i26b, i26c, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                        i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                        i26b, i26c, i26, i27, i28, i29, i30);
+
+            return i1;
         } break;
         case 6: { // src2 and dst spill
-            REWRITE_ERROR(STD_OUTF, "not implemented\n");
+            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(src1_idx_reg, dst_data_reg, DR_REG_NULL);
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_idx_reg, spill_src2_reg, DR_REG_NULL);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(src2) -> spill_src2
+            instr_t *i6c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_data_reg)), OPSZ_16);
+            // tls(dst) -> spill_dst
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_data_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← data_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA, OPSZ_16), op_spill_dst);
+            // vmovdqu %src1, 16(%rsp)         # [rsp+16]  ← index_array[0..7]
+            instr_t *i7 =
+                INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16),
+                                     opnd_create_reg(src1_idx_reg));
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← mem_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_MEM, OPSZ_16), op_spill_src2);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  16(%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp+16 + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_data                  # if bit3 is 0, jump to .Lfrom_data
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_DATA_LABEL));
+
+            /* fallthrough branch to select from mem_array */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = mem_array[idx]
+            instr_t *i15 =
+                INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_MEM, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from data label */
+            // .Lfrom_data: instr_t *FROM_DATA_LABEL
+            instr_t *i17 = FROM_DATA_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  (%rsp,%rax,2), %edx     # edx = data_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_DATA, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_data_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                         i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                         i26b, i26c, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 37, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6, i7, i8, i9, i10, i11,
+                                        i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26a,
+                                        i26b, i26c, i26, i27, i28, i29, i30);
+
+            return i1;
         } break;
         case 7: { // src1, src2 and dst spill
-            REWRITE_ERROR(STD_OUTF, "not implemented\n");
+            reg_id_t spill_src1_reg =
+                find_available_spill_xmm_avoiding_variadic(3, src1_idx_reg, src2_data_reg, dst_data_reg);
+            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding_variadic(4, src1_idx_reg, src2_data_reg,
+                                                                                 dst_data_reg, spill_src1_reg);
+            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding_variadic(
+                5, src1_idx_reg, src2_data_reg, dst_data_reg, spill_src1_reg, spill_src2_reg);
+            opnd_t op_spill_src1 = opnd_create_reg(spill_src1_reg);
+            opnd_t op_spill_src2 = opnd_create_reg(spill_src2_reg);
+            opnd_t op_spill_dst = opnd_create_reg(spill_dst_reg);
+
+            // allocate frame, skip the red zone, plus scratch + save + slack for push
+            instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
+
+            // push, save xflags
+            instr_t *i2 = INSTR_CREATE_pushf(dcontext);
+            // save rax, rdx, rcx
+            instr_t *i3 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
+            instr_t *i4 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
+            instr_t *i5 = INSTR_CREATE_mov_st(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
+
+            /* store the 3 xmm regs to stack */
+            // spill_src1 -> tls(spill_src1)
+            instr_t *i6a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // spill_src2 -> tls(spill_src2)
+            instr_t *i6b = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // spill_dst -> tls(spill_dst)
+            instr_t *i6c = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                  TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // tls(src1) -> spill_src1
+            instr_t *i6d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_idx_reg)), OPSZ_16);
+            // tls(src2) -> spill_src2
+            instr_t *i6e = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_data_reg)), OPSZ_16);
+            // tls(dst) -> spill_dst
+            instr_t *i6f = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_data_reg)), OPSZ_16);
+
+            // vmovdqu %spill_dst, (%rsp)           # [rsp+0]   ← data_array[0..7]
+            instr_t *i6 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA, OPSZ_16), op_spill_dst);
+            // vmovdqu %spill_src1, 16(%rsp)         # [rsp+16]  ← index_array[0..7]
+            instr_t *i7 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_16), op_spill_src1);
+            // vmovdqu %spill_src2, 32(%rsp)         # [rsp+32]  ← mem_array[0..7]
+            instr_t *i8 = INSTR_CREATE_vmovdqu(
+                dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_MEM, OPSZ_16), op_spill_src2);
+
+            /* init loop counter */
+            // xor %ecx, %ecx    # i = 0
+            instr_t *i9 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
+
+            /* loop label */
+            // .L_loop:  instr_t *LOOP_LABEL
+            instr_t *i10 = LOOP_LABEL;
+
+            /* load index = index_array[i] */
+            // movzwl  16(%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp+16 + i*2)
+            instr_t *i11 = INSTR_CREATE_movzx(dcontext, op_eax, // OP_movzx => movzxwl
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
+            // test $0x08, %eax                # test bit3 (0x08) for XMM
+            instr_t *i12 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x08));
+            // jz .Lfrom_data                  # if bit3 is 0, jump to .Lfrom_data
+            instr_t *i13 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_DATA_LABEL));
+
+            /* fallthrough branch to select from mem_array */
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i14 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  32(%rsp, %rax, 2), %edx   # edx = mem_array[idx]
+            instr_t *i15 =
+                INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_MEM, OPSZ_2));
+            // jmp .Lstore
+            instr_t *i16 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
+
+            /* from data label */
+            // .Lfrom_data: instr_t *FROM_DATA_LABEL
+            instr_t *i17 = FROM_DATA_LABEL;
+
+            // and $0x07, %eax                 # eax = eax & 0x07 keep lower 3 bits [2:0] for XMM
+            instr_t *i18 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x07, OPSZ_1));
+            // movzwl  (%rsp,%rax,2), %edx     # edx = data_array[idx]
+            instr_t *i19 = INSTR_CREATE_movzx(dcontext, op_edx,
+                                              opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_DATA, OPSZ_2));
+            /* store label */
+            // .Lstore: instr_t *STORE_LABEL
+            instr_t *i20 = STORE_LABEL;
+
+            // movw    %dx, 48(%rsp,%rcx,2)   # *(uint16_t*)(rsp + i*2) = dx
+            instr_t *i21 =
+                INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
+                                    opnd_create_reg(DR_REG_DX));
+            // inc     %ecx                    # i++
+            instr_t *i22 = INSTR_CREATE_inc(dcontext, op_ecx);
+            // cmp     $8, %ecx                # Compare with 8 for XMM (8 elements)
+            instr_t *i23 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x08));
+            // jne     .Loop                   # If i < 8, continue
+            instr_t *i24 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
+
+            // vmovdqu 48(%rsp), %spill_dst
+            instr_t *i25 = INSTR_CREATE_vmovdqu(dcontext, op_spill_dst,
+                                                opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_16));
+
+            // spill_dst -> tls(dst)
+            instr_t *i26a = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
+                                                   TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_data_reg)), OPSZ_16);
+            // tls(spill_src1) -> spill_src1
+            instr_t *i26b = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
+            // tls(spill_src2) -> spill_src2
+            instr_t *i26c = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
+            // tls(spill_dst) -> spill_dst
+            instr_t *i26d = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
+                                                        TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
+
+            // Restore stack and return
+            // restore rax, rdx, rcx
+            instr_t *i26 = INSTR_CREATE_mov_ld(dcontext, op_rax,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
+            instr_t *i27 = INSTR_CREATE_mov_ld(dcontext, op_rdx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
+            instr_t *i28 = INSTR_CREATE_mov_ld(dcontext, op_rcx,
+                                               opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
+            instr_t *i29 = INSTR_CREATE_popf(dcontext);
+            instr_t *i30 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
+
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 39, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6e, i6f, i6, i7, i8, i9,
+                                         i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                         i26a, i26b, i26c, i26d, i26, i27, i28, i29, i30);
+#endif
+            instrlist_concat_next_instr(ilist, 39, i1, i2, i3, i4, i5, i6a, i6b, i6c, i6d, i6e, i6f, i6, i7, i8, i9,
+                                        i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25,
+                                        i26a, i26b, i26c, i26d, i26, i27, i28, i29, i30);
+
+            return i1;
         } break;
         default: {
             REWRITE_INFO(STD_OUTF, "vpermt2w xmm and xmm pattern not support\n");
         } break;
         }
     } else { // writemask, need to know merging mode or zero mode
+        // TODO: impl this kind
     }
     return NULL_INSTR;
 }
@@ -33161,6 +38324,7 @@ vpermt2w_k_m16_xmm_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     } else { // writemask, need to know merging mode or zero mode
+        // TODO: impl this kind
     }
     return NULL_INSTR;
 }
@@ -33169,203 +38333,6 @@ instr_t *
 vpermt2w_k_zmm_zmm_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_idx_reg,
                            reg_id_t src2_data_reg, reg_id_t dst_data_reg, reg_id_t mask_reg)
 {
-    // e.g. vpermt2w {%k0} %zmm3 %zmm4 -> %zmm0
-    // AT&T format:  vpermt2w  %zmm4, %zmm3, %zmm0
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    // if k0 no mask
-    if (mask_reg == DR_REG_K0) {
-
-        enum { REDZONE = 128, Z = SIZE_OF_ZMM };         // Z==64
-        enum { SCRATCH = 4 * Z /*dst, idx, src, out*/ }; // 256
-        enum { SAVE = 8 /*rflags*/ + 8 * 3 /*rax,rdx,rcx*/ };
-        enum { SLACK_FOR_PUSH = 8 };
-        enum { FRAME = ((REDZONE + SCRATCH + SAVE + SLACK_FOR_PUSH + 15) & ~15) };
-
-        const int OFF_DST = REDZONE + 0 * Z;
-        const int OFF_SRC = REDZONE + 1 * Z;
-        const int OFF_IDX = REDZONE + 2 * Z;
-        const int OFF_DATA = REDZONE + 3 * Z;
-        const int OFF_RFLAGS = REDZONE + 4 * Z;
-        const int OFF_RAX = OFF_RFLAGS + 8;
-        const int OFF_RDX = OFF_RAX + 8;
-        const int OFF_RCX = OFF_RDX + 8;
-
-        opnd_t op_rax = opnd_create_reg(DR_REG_RAX);
-        opnd_t op_rdx = opnd_create_reg(DR_REG_RDX);
-        opnd_t op_rcx = opnd_create_reg(DR_REG_RCX);
-        opnd_t op_eax = opnd_create_reg(DR_REG_EAX);
-        opnd_t op_ecx = opnd_create_reg(DR_REG_ECX);
-        opnd_t op_edx = opnd_create_reg(DR_REG_EDX);
-        opnd_t op_rsp = opnd_create_reg(DR_REG_RSP);
-
-        // free ymm registers for ZMM operations
-        reg_id_t ymm_spill1 = find_available_spill_ymm_avoiding_variadic(
-            3, ZMM_TO_YMM(src1_idx_reg), ZMM_TO_YMM(src2_data_reg), ZMM_TO_YMM(dst_data_reg));
-        reg_id_t ymm_spill2 = find_available_spill_ymm_avoiding_variadic(
-            4, ZMM_TO_YMM(src1_idx_reg), ZMM_TO_YMM(src2_data_reg), ZMM_TO_YMM(dst_data_reg), ymm_spill1);
-        reg_id_t ymm_spill3 = find_available_spill_ymm_avoiding_variadic(
-            5, ZMM_TO_YMM(src1_idx_reg), ZMM_TO_YMM(src2_data_reg), ZMM_TO_YMM(dst_data_reg), ymm_spill1, ymm_spill2);
-
-        /* main logic of loop-based vpermt2w emulation */
-        instr_t *LOOP_LABEL = INSTR_CREATE_label(dcontext);
-        instr_t *FROM_DATA_LABEL = INSTR_CREATE_label(dcontext);
-        instr_t *STORE_LABEL = INSTR_CREATE_label(dcontext);
-
-        /* pushf, save xflags to avoid pollution */
-        // allocate frame, skip the red zone, plus scratch + save + slack for push
-        instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
-
-        // push, save xflags
-        instr_t *i2 = INSTR_CREATE_pushf(dcontext);
-        // save rax, rdx, rcx
-        instr_t *i3 =
-            INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
-        instr_t *i4 =
-            INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
-        instr_t *i5 =
-            INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
-
-        // save spill registers
-        instr_t *i6 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill1)), OPSZ_32);
-        instr_t *i7 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill2)), OPSZ_32);
-        instr_t *i8 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill3, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill3)), OPSZ_32);
-
-        /* store the 3 zmm regs to stack using YMM operations */
-        // Store dst_data_reg (lower half)
-        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)), OPSZ_32);
-        instr_t *i10 =
-            INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA, OPSZ_32),
-                                 opnd_create_reg(ymm_spill1));
-        // Store dst_data_reg (upper half)
-        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(
-            dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)) + SIZE_OF_YMM, OPSZ_32);
-        instr_t *i12 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA + SIZE_OF_YMM, OPSZ_32),
-            opnd_create_reg(ymm_spill1));
-
-        // Store src1_idx_reg (lower half)
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1,
-                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_idx_reg)), OPSZ_32);
-        instr_t *i14 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_32), opnd_create_reg(ymm_spill1));
-        // Store src1_idx_reg (upper half)
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(
-            dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_idx_reg)) + SIZE_OF_YMM, OPSZ_32);
-        instr_t *i16 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX + SIZE_OF_YMM, OPSZ_32),
-            opnd_create_reg(ymm_spill1));
-
-        // Store src2_data_reg (lower half)
-        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1,
-                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_data_reg)), OPSZ_32);
-        instr_t *i18 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_SRC, OPSZ_32), opnd_create_reg(ymm_spill1));
-        // Store src2_data_reg (upper half)
-        instr_t *i19 = RESTORE_SIMD_FROM_SIZED_TLS(
-            dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_data_reg)) + SIZE_OF_YMM, OPSZ_32);
-        instr_t *i20 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_SRC + SIZE_OF_YMM, OPSZ_32),
-            opnd_create_reg(ymm_spill1));
-
-        /* init loop counter */
-        // xor %ecx, %ecx    # i = 0
-        instr_t *i21 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
-
-        /* loop label */
-        // .L_loop:  instr_t *LOOP_LABEL
-        instr_t *i22 = LOOP_LABEL;
-
-        /* load index = index_array[i] */
-        // movzwl  OFF_IDX(%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp+OFF_IDX + i*2)
-        instr_t *i23 =
-            INSTR_CREATE_movzx(dcontext, op_eax, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
-        // test $0x20, %eax                # test bit5 (0x20) for ZMM
-        instr_t *i24 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x20));
-        // jz .Lfrom_data                  # if bit5 is 0, jump to .Lfrom_data
-        instr_t *i25 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_DATA_LABEL));
-
-        /* fallthrough branch to select from src_array */
-        // and $0x1f, %eax                 # eax = eax & 0x1f keep lower 5 bits [4:0] for ZMM
-        instr_t *i26 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x1f, OPSZ_1));
-        // movzwl  OFF_SRC(%rsp, %rax, 2), %edx   # edx = src_array[idx]
-        instr_t *i27 =
-            INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_SRC, OPSZ_2));
-        // jmp .Lstore
-        instr_t *i28 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
-
-        /* from data label */
-        // .Lfrom_data: instr_t *FROM_DATA_LABEL
-        instr_t *i29 = FROM_DATA_LABEL;
-
-        // and $0x1f, %eax                 # eax = eax & 0x1f keep lower 5 bits [4:0] for ZMM
-        instr_t *i30 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x1f, OPSZ_1));
-        // movzwl  OFF_DATA(%rsp,%rax,2), %edx     # edx = data_array[idx]
-        instr_t *i31 =
-            INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_DATA, OPSZ_2));
-        /* store label */
-        // .Lstore: instr_t *STORE_LABEL
-        instr_t *i32 = STORE_LABEL;
-
-        // movw    %dx, OFF_DST(%rsp,%rcx,2)   # *(uint16_t*)(rsp + OFF_DST + i*2) = dx
-        instr_t *i33 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
-                                           opnd_create_reg(DR_REG_DX));
-        // inc     %ecx                    # i++
-        instr_t *i34 = INSTR_CREATE_inc(dcontext, op_ecx);
-        // cmp     $32, %ecx                # Compare with 32 for ZMM (32 elements)
-        instr_t *i35 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x20));
-        // jne     .Loop                   # If i < 32, continue
-        instr_t *i36 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
-
-        // Load result back to zmm register (lower half)
-        instr_t *i37 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(ymm_spill1),
-                                            opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_32));
-        instr_t *i38 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)), OPSZ_32);
-        // Load result back to zmm register (upper half)
-        instr_t *i39 =
-            INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(ymm_spill1),
-                                 opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST + SIZE_OF_YMM, OPSZ_32));
-        instr_t *i40 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill1,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)) + SIZE_OF_YMM, OPSZ_32);
-
-        // restore spill registers
-        instr_t *i41 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill1)), OPSZ_32);
-        instr_t *i42 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill2)), OPSZ_32);
-        instr_t *i43 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill3, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill3)), OPSZ_32);
-
-        // Restore stack and return
-        // restore rax, rdx, rcx
-        instr_t *i44 =
-            INSTR_CREATE_mov_ld(dcontext, op_rax, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
-        instr_t *i45 =
-            INSTR_CREATE_mov_ld(dcontext, op_rdx, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
-        instr_t *i46 =
-            INSTR_CREATE_mov_ld(dcontext, op_rcx, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
-        instr_t *i47 = INSTR_CREATE_popf(dcontext);
-        instr_t *i48 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 48, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
-                                     i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31,
-                                     i32, i33, i34, i35, i36, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47,
-                                     i48);
-#endif
-        instrlist_concat_next_instr(ilist, 48, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
-                                    i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31, i32, i33,
-                                    i34, i35, i36, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47, i48);
-
-        return i1;
-    } else { // writemask, need to know merging mode or zero mode
-    }
     return NULL_INSTR;
 }
 
@@ -33373,209 +38340,6 @@ instr_t *
 vpermt2w_k_m64_zmm_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_idx_reg,
                            opnd_t src2_data_opnd, reg_id_t dst_data_reg, reg_id_t mask_reg)
 {
-    // e.g. vpermt2w {%k0} %zmm3 0x20(%r12,%rax,2)[64byte] -> %zmm0
-    // vpermt2w {%k0} %zmm3 <rel> 0x00007f9b617aa840[64byte] -> %zmm0
-    // server for both BASE DISP Format and REL ADDRESS Format
-    instrlist_remove(ilist, instr);
-    instr_destroy(dcontext, instr);
-
-    // if k0 no mask
-    if (mask_reg == DR_REG_K0) {
-
-        enum { REDZONE = 128, Z = SIZE_OF_ZMM };         // Z==64
-        enum { SCRATCH = 4 * Z /*dst, idx, mem, out*/ }; // 256
-        enum { SAVE = 8 /*rflags*/ + 8 * 3 /*rax,rdx,rcx*/ };
-        enum { SLACK_FOR_PUSH = 8 };
-        enum { FRAME = ((REDZONE + SCRATCH + SAVE + SLACK_FOR_PUSH + 15) & ~15) };
-
-        const int OFF_DST = REDZONE + 0 * Z;
-        const int OFF_MEM = REDZONE + 1 * Z;
-        const int OFF_IDX = REDZONE + 2 * Z;
-        const int OFF_DATA = REDZONE + 3 * Z;
-        const int OFF_RFLAGS = REDZONE + 4 * Z;
-        const int OFF_RAX = OFF_RFLAGS + 8;
-        const int OFF_RDX = OFF_RAX + 8;
-        const int OFF_RCX = OFF_RDX + 8;
-
-        opnd_t op_rax = opnd_create_reg(DR_REG_RAX);
-        opnd_t op_rdx = opnd_create_reg(DR_REG_RDX);
-        opnd_t op_rcx = opnd_create_reg(DR_REG_RCX);
-        opnd_t op_eax = opnd_create_reg(DR_REG_EAX);
-        opnd_t op_ecx = opnd_create_reg(DR_REG_ECX);
-        opnd_t op_edx = opnd_create_reg(DR_REG_EDX);
-        opnd_t op_rsp = opnd_create_reg(DR_REG_RSP);
-
-        // free ymm registers for ZMM operations
-        reg_id_t ymm_spill1 =
-            find_available_spill_ymm_avoiding_variadic(2, ZMM_TO_YMM(src1_idx_reg), ZMM_TO_YMM(dst_data_reg));
-        reg_id_t ymm_spill2 = find_available_spill_ymm_avoiding_variadic(3, ZMM_TO_YMM(src1_idx_reg),
-                                                                         ZMM_TO_YMM(dst_data_reg), ymm_spill1);
-        reg_id_t ymm_spill3 = find_available_spill_ymm_avoiding_variadic(
-            4, ZMM_TO_YMM(src1_idx_reg), ZMM_TO_YMM(dst_data_reg), ymm_spill1, ymm_spill2);
-
-        /* main logic of loop-based vpermt2w emulation */
-        instr_t *LOOP_LABEL = INSTR_CREATE_label(dcontext);
-        instr_t *FROM_DATA_LABEL = INSTR_CREATE_label(dcontext);
-        instr_t *STORE_LABEL = INSTR_CREATE_label(dcontext);
-
-        /* pushf, save xflags to avoid pollution */
-        // allocate frame, skip the red zone, plus scratch + save + slack for push
-        instr_t *i1 = INSTR_CREATE_sub(dcontext, op_rsp, OPND_CREATE_INT32(FRAME));
-
-        // push, save xflags
-        instr_t *i2 = INSTR_CREATE_pushf(dcontext);
-        // save rax, rdx, rcx
-        instr_t *i3 =
-            INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8), op_rax);
-        instr_t *i4 =
-            INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8), op_rdx);
-        instr_t *i5 =
-            INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8), op_rcx);
-
-        // save spill registers
-        instr_t *i6 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill1)), OPSZ_32);
-        instr_t *i7 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill2)), OPSZ_32);
-        instr_t *i8 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill3, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill3)), OPSZ_32);
-
-        /* store the zmm regs to stack using YMM operations */
-        // Store dst_data_reg (lower half)
-        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1,
-                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)), OPSZ_32);
-        instr_t *i10 =
-            INSTR_CREATE_vmovdqu(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA, OPSZ_32),
-                                 opnd_create_reg(ymm_spill1));
-        // Store dst_data_reg (upper half)
-        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(
-            dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)) + SIZE_OF_YMM, OPSZ_32);
-        instr_t *i12 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DATA + SIZE_OF_YMM, OPSZ_32),
-            opnd_create_reg(ymm_spill1));
-
-        // Store src1_idx_reg (lower half)
-        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1,
-                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_idx_reg)), OPSZ_32);
-        instr_t *i14 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX, OPSZ_32), opnd_create_reg(ymm_spill1));
-        // Store src1_idx_reg (upper half)
-        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(
-            dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_idx_reg)) + SIZE_OF_YMM, OPSZ_32);
-        instr_t *i16 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_IDX + SIZE_OF_YMM, OPSZ_32),
-            opnd_create_reg(ymm_spill1));
-
-        // Load memory data and store to stack (lower half)
-        instr_t *i17 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_reg(ymm_spill1),
-            opnd_create_base_disp(opnd_get_base(src2_data_opnd), opnd_get_index(src2_data_opnd),
-                                  opnd_get_scale(src2_data_opnd), opnd_get_disp(src2_data_opnd), OPSZ_32));
-        instr_t *i18 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_MEM, OPSZ_32), opnd_create_reg(ymm_spill1));
-        // Load memory data and store to stack (upper half)
-        instr_t *i19 =
-            INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(ymm_spill1),
-                                 opnd_create_base_disp(opnd_get_base(src2_data_opnd), opnd_get_index(src2_data_opnd),
-                                                       opnd_get_scale(src2_data_opnd),
-                                                       opnd_get_disp(src2_data_opnd) + SIZE_OF_YMM, OPSZ_32));
-        instr_t *i20 = INSTR_CREATE_vmovdqu(
-            dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_MEM + SIZE_OF_YMM, OPSZ_32),
-            opnd_create_reg(ymm_spill1));
-
-        /* init loop counter */
-        // xor %ecx, %ecx    # i = 0
-        instr_t *i21 = INSTR_CREATE_xor(dcontext, op_ecx, op_ecx);
-
-        /* loop label */
-        // .L_loop:  instr_t *LOOP_LABEL
-        instr_t *i22 = LOOP_LABEL;
-
-        /* load index = index_array[i] */
-        // movzwl  OFF_IDX(%rsp,%rcx,2), %eax   # eax = *(uint16_t*)(rsp+OFF_IDX + i*2)
-        instr_t *i23 =
-            INSTR_CREATE_movzx(dcontext, op_eax, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_IDX, OPSZ_2));
-        // test $0x20, %eax                # test bit5 (0x20) for ZMM
-        instr_t *i24 = INSTR_CREATE_test(dcontext, op_eax, OPND_CREATE_INT32(0x20));
-        // jz .Lfrom_data                  # if bit5 is 0, jump to .Lfrom_data
-        instr_t *i25 = INSTR_CREATE_jcc_short(dcontext, OP_jz, opnd_create_instr(FROM_DATA_LABEL));
-
-        /* fallthrough branch to select from mem_array */
-        // and $0x1f, %eax                 # eax = eax & 0x1f keep lower 5 bits [4:0] for ZMM
-        instr_t *i26 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x1f, OPSZ_1));
-        // movzwl  OFF_MEM(%rsp, %rax, 2), %edx   # edx = mem_array[idx]
-        instr_t *i27 =
-            INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_MEM, OPSZ_2));
-        // jmp .Lstore
-        instr_t *i28 = INSTR_CREATE_jmp_short(dcontext, opnd_create_instr(STORE_LABEL));
-
-        /* from data label */
-        // .Lfrom_data: instr_t *FROM_DATA_LABEL
-        instr_t *i29 = FROM_DATA_LABEL;
-
-        // and $0x1f, %eax                 # eax = eax & 0x1f keep lower 5 bits [4:0] for ZMM
-        instr_t *i30 = INSTR_CREATE_and(dcontext, op_eax, opnd_create_immed_int(0x1f, OPSZ_1));
-        // movzwl  OFF_DATA(%rsp,%rax,2), %edx     # edx = data_array[idx]
-        instr_t *i31 =
-            INSTR_CREATE_movzx(dcontext, op_edx, opnd_create_base_disp(DR_REG_RSP, DR_REG_RAX, 2, OFF_DATA, OPSZ_2));
-        /* store label */
-        // .Lstore: instr_t *STORE_LABEL
-        instr_t *i32 = STORE_LABEL;
-
-        // movw    %dx, OFF_DST(%rsp,%rcx,2)   # *(uint16_t*)(rsp + OFF_DST + i*2) = dx
-        instr_t *i33 = INSTR_CREATE_mov_st(dcontext, opnd_create_base_disp(DR_REG_RSP, DR_REG_RCX, 2, OFF_DST, OPSZ_2),
-                                           opnd_create_reg(DR_REG_DX));
-        // inc     %ecx                    # i++
-        instr_t *i34 = INSTR_CREATE_inc(dcontext, op_ecx);
-        // cmp     $32, %ecx                # Compare with 32 for ZMM (32 elements)
-        instr_t *i35 = INSTR_CREATE_cmp(dcontext, op_ecx, OPND_CREATE_INT32(0x20));
-        // jne     .Loop                   # If i < 32, continue
-        instr_t *i36 = INSTR_CREATE_jcc_short(dcontext, OP_jne, opnd_create_instr(LOOP_LABEL));
-
-        // Load result back to zmm register (lower half)
-        instr_t *i37 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(ymm_spill1),
-                                            opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST, OPSZ_32));
-        instr_t *i38 =
-            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)), OPSZ_32);
-        // Load result back to zmm register (upper half)
-        instr_t *i39 =
-            INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(ymm_spill1),
-                                 opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_DST + SIZE_OF_YMM, OPSZ_32));
-        instr_t *i40 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill1,
-                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_data_reg)) + SIZE_OF_YMM, OPSZ_32);
-
-        // restore spill registers
-        instr_t *i41 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill1, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill1)), OPSZ_32);
-        instr_t *i42 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill2, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill2)), OPSZ_32);
-        instr_t *i43 =
-            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill3, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill3)), OPSZ_32);
-
-        // Restore stack and return
-        // restore rax, rdx, rcx
-        instr_t *i44 =
-            INSTR_CREATE_mov_ld(dcontext, op_rax, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RAX, OPSZ_8));
-        instr_t *i45 =
-            INSTR_CREATE_mov_ld(dcontext, op_rdx, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RDX, OPSZ_8));
-        instr_t *i46 =
-            INSTR_CREATE_mov_ld(dcontext, op_rcx, opnd_create_base_disp(DR_REG_RSP, DR_REG_NULL, 0, OFF_RCX, OPSZ_8));
-        instr_t *i47 = INSTR_CREATE_popf(dcontext);
-        instr_t *i48 = INSTR_CREATE_add(dcontext, opnd_create_reg(DR_REG_RSP), OPND_CREATE_INT32(FRAME));
-
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 48, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
-                                     i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31,
-                                     i32, i33, i34, i35, i36, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47,
-                                     i48);
-#endif
-        instrlist_concat_next_instr(ilist, 48, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
-                                    i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31, i32, i33,
-                                    i34, i35, i36, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47, i48);
-
-        return i1;
-    } else { // writemask, need to know merging mode or zero mode
-    }
     return NULL_INSTR;
 }
 
@@ -33805,6 +38569,7 @@ vpermt2d_k_ymm_ymm_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *in
 
         return i1;
     } else {
+        // TODO: support masking (merging/zeroing)
     }
     return NULL_INSTR;
 }
@@ -34058,7 +38823,7 @@ vpmullq_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr
     // vmovq %rdx(src), %xmm15(dst) // NOTE: %xmm15 low 64 bits store the second mul value
     instr_t *new_instr14 = INSTR_CREATE_vmovq(dcontext, xmm15_free_opnd, rdx_opnd);
 
-    // vmovlhps %xmm0(dst), %xmm15, %xmm0(dst) // %xmm15 low 64 bits to %xmm0 high 64 bits 
+    // vmovlhps %xmm0(dst), %xmm15, %xmm0(dst) // %xmm15 low 64 bits to %xmm0 high 64 bits, TODO: other instr may do
     //                            xmm0
     // | ----- 64 bits high ------ | ----- 64 bits low ----- |
     // |      xmm15 low 64 bits    |      xmm0 low 64 bits   |
@@ -35241,6 +40006,7 @@ rw_func_vpmullq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
     opnd_t src2_opnd = instr_get_src(instr, 2);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
     bool broadcast = instr_get_prefix_flag(instr, PREFIX_EVEX_b);
+    // TODO: broadcast needs special handling
 #ifdef DEBUG
     print_rewrite_info(dcontext, ilist, instr, instr_start, "vpmullq", true, true, true, true);
     REWRITE_INFO(STD_ERRF, "Need broadcast: %d\n", broadcast);
@@ -35288,12 +40054,609 @@ rw_func_vpmullq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc
  * ============================================= */
 
 instr_t *
-vporq_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg1, reg_id_t src_reg2,
+vporq_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
                       reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src1_reg_lower = DR_REG_NULL;
+    reg_id_t src1_reg_upper = DR_REG_NULL;
+    reg_id_t src2_reg_lower = DR_REG_NULL;
+    reg_id_t src2_reg_upper = DR_REG_NULL;
+    reg_id_t dst_reg_lower = DR_REG_NULL;
+    reg_id_t dst_reg_upper = DR_REG_NULL;
+
+    const uint src1_need_spill = NEED_SPILL_ZMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_ZMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { /* no spill */
+        if (src1_reg == dst_reg) {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = src1_reg_lower;
+            src1_reg_upper = find_available_spill_ymm_avoiding_variadic(2, src1_reg_lower, src2_reg_lower);
+            src2_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, src1_reg_upper);
+            dst_reg_upper = src1_reg_upper;
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vpsubq
+            instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i7 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "vporq zmm reg2reg not support");
+            print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
 #endif
+            instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+            return i1;
+        } else {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            src1_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+            src2_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                        dst_reg_lower, src1_reg_upper);
+            dst_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                       src1_reg_upper, src2_reg_upper);
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // save dst-up -> tls(dst-up)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vpsubq
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i8 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // restore dst-up from tls(dst-up)
+            instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+#endif
+            instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+            return i1;
+        }
+    } break;
+    case 1: { /* src1 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src1 needs special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src2 needs special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 3: { /* both src1 and src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and src2 need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i12 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18);
+#endif
+        instrlist_concat_next_instr(ilist, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - dst needs special handling
+        reg_id_t spill_dst_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_dst_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load upper parts of source registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i9 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+#endif
+        instrlist_concat_next_instr(ilist, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+        return i1;
+    } break;
+    case 5: { /* both src1 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and dst need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 6: { /* both src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src2 and dst need special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 7: { /* all src1, src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - all registers need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(
+            5, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(
+            6, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                    src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(8, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                   src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i6 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(spill_dst_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i12 = instr_create_1dst_2src(dcontext, OP_vpor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i13 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i19 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i20 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18, i19, i20);
+#endif
+        instrlist_concat_next_instr(ilist, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18, i19, i20);
+        return i1;
+    } break;
+    }
     return NULL_INSTR;
 }
 
@@ -36001,6 +41364,7 @@ vporq_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, 
         }
     } else { // need use mask
         // unsigned char imm8 = rewrite_reserved_opmask[k_idx];
+        // TODO: add vpxor and vpblend, there is a problem, vpblendd don't support quadwords, only double words,
         // then how to make it corrdinates with vpxorq's quadword,
     }
     return NULL_INSTR;
@@ -36040,7 +41404,7 @@ instr_t *
 vprolq_xmm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                          int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
 {
-    // vprolq {%k1} $0x01 %xmm2 -> %xmm3
+    // vprolq {%k0} $0x01 %xmm2 -> %xmm3
     opnd_t src_opnd = create_mapping_xmm_opnd(dcontext, src_reg);
     opnd_t dst_opnd = create_mapping_xmm_opnd(dcontext, dst_reg);
     int8_t right_rotate_imm = imm_int;
@@ -36102,10 +41466,51 @@ instr_t *
 vprolq_ymm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                          int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // vprolq {%k0} $0x01 %ymm2 -> %ymm3
+    opnd_t op_src = opnd_create_reg(src_reg);
+    opnd_t op_dst = opnd_create_reg(dst_reg);
+    // immediate value
+    int8_t right_rotate_imm = imm_int;
+    int8_t left_rotate_imm = 64 - right_rotate_imm;
+
+    // we need two spill simd ymm
+    reg_id_t ymm_spill_sll = find_one_available_spill_ymm(src_reg);
+    reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, ymm_spill_sll, DR_REG_NULL);
+    opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+    opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+    // ymm_spill_sll -> tls(ymm_spill_sll)
+    instr_t *i1 =
+        SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+    // ymm_spill_srl -> tls(ymm_spill_srl)
+    instr_t *i2 =
+        SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+    // vmovdqu src -> ymm_spill_sll
+    instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src);
+    // vmovdqu src -> ymm_spill_srl
+    instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src);
+    // vpsllq right_rotate_imm -> ymm_spill_sll
+    instr_t *i5 =
+        INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+    // vpsrlq left_rotate_imm -> ymm_spill_srl
+    instr_t *i6 = INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+    // vpor ymm_spill_srl, ymm_spill_sll, dst
+    instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst, op_ymm_srl, op_ymm_sll);
+    // tls(ymm_spill_sll) -> ymm_spill_sll
+    instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+    // tls(ymm_spill_srl) -> ymm_spill_srl
+    instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+    instrlist_concat_next_instr(ilist, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "vprolq {%k1} %ymm0 %ymm1 -> %ymm2 not support");
+    print_rewrite_variadic_instr(dcontext, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
 #endif
-    return NULL_INSTR;
+    return i1;
 }
 
 instr_t *
@@ -36122,9 +41527,268 @@ instr_t *
 vprolq_zmm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                          int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // vprolq {%k0} $0x01 %zmm2 -> %zmm3
+    // opnd_t op_src = opnd_create_reg(src_reg);
+    // opnd_t op_dst = opnd_create_reg(dst_reg);
+
+    // immediate value
+    int8_t right_rotate_imm = imm_int;
+    int8_t left_rotate_imm = 64 - right_rotate_imm;
+
+    const uint src_need_spill = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 2 : 0;
+    const uint spill_flag = src_need_spill | dst_need_spill;
+
+    // may used ZMM's lower 256bit ymm counterparts
+    reg_id_t src_ymm = ZMM_TO_YMM(src_reg);
+    reg_id_t dst_ymm = ZMM_TO_YMM(dst_reg);
+    opnd_t op_src_ymm = opnd_create_reg(src_ymm);
+    opnd_t op_dst_ymm = opnd_create_reg(dst_ymm);
+
+    switch (spill_flag) {
+    case 0: { // no spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // vmovdqu src -> ymm_spill_sll
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src_ymm);
+        // vmovdqu src -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src_ymm);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst_ymm, op_ymm_srl, op_ymm_sll);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i9 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i10 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i11 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i12 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "vprolq {%k1} %zmm0 %zmm1 -> %zmm2 not support");
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
 #endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 1: { // src spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // tls(src_reg low 256bits) -> ymm_spill_sll
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst_ymm, op_ymm_srl, op_ymm_sll);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i9 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i10 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i11 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i12 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 2: { // dst spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // vmovdqu src -> ymm_spill_sll
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src_ymm);
+        // vmovdqu src -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src_ymm);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg low 256bits)
+        instr_t *i8 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i10 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i11 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i12 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i13 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16);
+#endif
+        instrlist_concat_next_instr(ilist, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16);
+        return i1;
+    } break;
+    case 3: { // src, dst both spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // tls(src_reg low 256bits) -> ymm_spill_sll
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg low 256bits)
+        instr_t *i8 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i10 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq right_rotate_imm -> ymm_spill_sll
+        instr_t *i11 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq left_rotate_imm -> ymm_spill_srl
+        instr_t *i12 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i13 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16);
+#endif
+        instrlist_concat_next_instr(ilist, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vprolq zmm and immed spill flag not support"); return NULL_INSTR;
+    }
     return NULL_INSTR;
 }
 
@@ -36179,10 +41843,6 @@ rw_func_vprolq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         break;
     default: REWRITE_ERROR(STD_ERRF, "vprolq imm or src opnd kind not support"); return NULL_INSTR;
     }
-
-    // 1. vprorq {%k1} $0x01 %xmm2 -> %xmm3  => VPRORD ymm1 {k1}{z}, ymm2/m256/m32bcst, imm8
-    // 2. vprorq {%k1} %ymm2, %ymm3 -> %ymm4 => VPRORVQ ymm1 {k1}{z}, ymm2, ymm3/m256/m64bcst
-
     return NULL_INSTR;
 }
 
@@ -36212,10 +41872,8 @@ vprord_xmm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *inst
     instr_t *new_instr4 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(DR_REG_XMM15), src_opnd);
 
     // psrld $0x01, %xmm14
-    // psrld $0x01, %xmm14
     instr_t *new_instr5 =
         INSTR_CREATE_psrld(dcontext, opnd_create_reg(DR_REG_XMM14), opnd_create_immed_int(right_rotate_imm, OPSZ_1));
-    // pslld $0x01, %xmm15
     // pslld $0x01, %xmm15
     instr_t *new_instr6 =
         INSTR_CREATE_pslld(dcontext, opnd_create_reg(DR_REG_XMM15), opnd_create_immed_int(left_rotate_imm, OPSZ_1));
@@ -36255,10 +41913,51 @@ instr_t *
 vprord_ymm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                          int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // vprorq {%k0} $0x01 %ymm2 -> %ymm3
+    opnd_t op_src = opnd_create_reg(src_reg);
+    opnd_t op_dst = opnd_create_reg(dst_reg);
+    // immediate value
+    int8_t right_rotate_imm = imm_int;
+    int8_t left_rotate_imm = 64 - right_rotate_imm;
+
+    // we need two spill simd ymm
+    reg_id_t ymm_spill_sll = find_one_available_spill_ymm(src_reg);
+    reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, ymm_spill_sll, DR_REG_NULL);
+    opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+    opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+    // ymm_spill_sll -> tls(ymm_spill_sll)
+    instr_t *i1 =
+        SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+    // ymm_spill_srl -> tls(ymm_spill_srl)
+    instr_t *i2 =
+        SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+    // vmovdqu src -> ymm_spill_sll
+    instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src);
+    // vmovdqu src -> ymm_spill_srl
+    instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src);
+    // vpslld left_rotate_imm -> ymm_spill_sll
+    instr_t *i5 = INSTR_CREATE_vpslld(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+    // vpsrld right_rotate_imm -> ymm_spill_srl
+    instr_t *i6 =
+        INSTR_CREATE_vpsrld(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+    // vpor ymm_spill_srl, ymm_spill_sll, dst
+    instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst, op_ymm_srl, op_ymm_sll);
+    // tls(ymm_spill_sll) -> ymm_spill_sll
+    instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+    // tls(ymm_spill_srl) -> ymm_spill_srl
+    instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+    instrlist_concat_next_instr(ilist, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "vprord {%k1} %ymm0 %ymm1 -> %ymm2 not support");
+    print_rewrite_variadic_instr(dcontext, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
 #endif
-    return NULL_INSTR;
+    return i1;
 }
 
 instr_t *
@@ -36297,7 +41996,6 @@ rw_func_vprord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
     print_rewrite_info(dcontext, ilist, instr, instr_start, "vprord", true, true, true, true);
 #endif
     opnd_t mask_opnd = instr_get_src(instr, 0);
-    opnd_t imm_or_src1_opnd = instr_get_src(instr, 1);
     opnd_t imm_or_src1_opnd = instr_get_src(instr, 1);
     opnd_t src2_opnd = instr_get_src(instr, 2);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
@@ -36360,12 +42058,9 @@ vprorq_xmm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *inst
     instr_t *new_instr4 = INSTR_CREATE_vmovdqu(dcontext, opnd_create_reg(DR_REG_XMM15), src_opnd);
 
     // psrlq $0x01, %xmm14
-    // psrlq $0x01, %xmm14
     instr_t *new_instr5 =
         INSTR_CREATE_vpsrlq(dcontext, opnd_create_reg(DR_REG_XMM14), opnd_create_immed_int(right_rotate_imm, OPSZ_1),
                             opnd_create_reg(DR_REG_XMM14));
-    // psllq $0x01, %xmm15
-        INSTR_CREATE_psrlq(dcontext, opnd_create_reg(DR_REG_XMM14), opnd_create_immed_int(right_rotate_imm, OPSZ_1));
     // psllq $0x01, %xmm15
     instr_t *new_instr6 =
         INSTR_CREATE_vpsllq(dcontext, opnd_create_reg(DR_REG_XMM15), opnd_create_immed_int(left_rotate_imm, OPSZ_1),
@@ -36406,6 +42101,57 @@ instr_t *
 vprorq_ymm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                          int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // vprorq {%k0} $0x01 %ymm2 -> %ymm3
+    opnd_t op_src = opnd_create_reg(src_reg);
+    opnd_t op_dst = opnd_create_reg(dst_reg);
+    // immediate value
+    int8_t right_rotate_imm = imm_int;
+    int8_t left_rotate_imm = 64 - right_rotate_imm;
+
+    // we need two spill simd ymm
+    reg_id_t ymm_spill_sll = find_one_available_spill_ymm(src_reg);
+    reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, ymm_spill_sll, DR_REG_NULL);
+    opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+    opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+    // ymm_spill_sll -> tls(ymm_spill_sll)
+    instr_t *i1 =
+        SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+    // ymm_spill_srl -> tls(ymm_spill_srl)
+    instr_t *i2 =
+        SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+    // vmovdqu src -> ymm_spill_sll
+    instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src);
+    // vmovdqu src -> ymm_spill_srl
+    instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src);
+    // vpsllq left_rotate_imm -> ymm_spill_sll
+    instr_t *i5 = INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+    // vpsrlq right_rotate_imm -> ymm_spill_srl
+    instr_t *i6 =
+        INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+    // vpor ymm_spill_srl, ymm_spill_sll, dst
+    instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst, op_ymm_srl, op_ymm_sll);
+    // tls(ymm_spill_sll) -> ymm_spill_sll
+    instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+    // tls(ymm_spill_srl) -> ymm_spill_srl
+    instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                              TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+    instrlist_concat_next_instr(ilist, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 9, i1, i2, i3, i4, i5, i6, i7, i8, i9);
+#endif
+    return i1;
+}
+
+instr_t *
+vprorq_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
+                       int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
+{
 #ifdef DEBUG
     REWRITE_ERROR(STD_ERRF, "vprorq {%k1} %ymm0 %ymm1 -> %ymm2 not support");
 #endif
@@ -36413,20 +42159,271 @@ vprorq_ymm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *inst
 }
 
 instr_t *
-vprorq_ymm_and_ymm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
-                       int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
-{
-
-    return NULL_INSTR;
-}
-
-instr_t *
 vprorq_zmm_and_immed_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg,
                          int8_t imm_int /* already mod 64*/, reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    // vprolq {%k0} $0x01 %zmm2 -> %zmm3
+    // opnd_t op_src = opnd_create_reg(src_reg);
+    // opnd_t op_dst = opnd_create_reg(dst_reg);
+
+    // immediate value
+    int8_t right_rotate_imm = imm_int;
+    int8_t left_rotate_imm = 64 - right_rotate_imm;
+
+    const uint src_need_spill = NEED_SPILL_ZMM(src_reg) ? 1 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 2 : 0;
+    const uint spill_flag = src_need_spill | dst_need_spill;
+
+    // may used ZMM's lower 256bit ymm counterparts
+    reg_id_t src_ymm = ZMM_TO_YMM(src_reg);
+    reg_id_t dst_ymm = ZMM_TO_YMM(dst_reg);
+    opnd_t op_src_ymm = opnd_create_reg(src_ymm);
+    opnd_t op_dst_ymm = opnd_create_reg(dst_ymm);
+
+    switch (spill_flag) {
+    case 0: { // no spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // vmovdqu src -> ymm_spill_sll
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src_ymm);
+        // vmovdqu src -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src_ymm);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst_ymm, op_ymm_srl, op_ymm_sll);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i9 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i10 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i11 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i12 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "vprorq {%k1} %zmm0 %zmm1 -> %zmm2 not support");
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
 #endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 1: { // src spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // tls(src_reg low 256bits) -> ymm_spill_sll
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_dst_ymm, op_ymm_srl, op_ymm_sll);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i9 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i10 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i11 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i12 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 2: { // dst spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // vmovdqu src -> ymm_spill_sll
+        instr_t *i3 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_sll, op_src_ymm);
+        // vmovdqu src -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_src_ymm);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg low 256bits)
+        instr_t *i8 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i10 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i11 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i12 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i13 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16);
+#endif
+        instrlist_concat_next_instr(ilist, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16);
+        return i1;
+    } break;
+    case 3: { // src, dst both spill
+        reg_id_t ymm_spill_sll = find_available_spill_ymm_avoiding(src_reg, dst_reg, DR_REG_NULL);
+        reg_id_t ymm_spill_srl = find_available_spill_ymm_avoiding(src_reg, dst_reg, ymm_spill_sll);
+
+        opnd_t op_ymm_sll = opnd_create_reg(ymm_spill_sll);
+        opnd_t op_ymm_srl = opnd_create_reg(ymm_spill_srl);
+
+        // ymm_spill_sll -> tls(ymm_spill_sll)
+        instr_t *i1 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // ymm_spill_srl -> tls(ymm_spill_srl)
+        instr_t *i2 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_srl, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+
+        /* first 256 bits vprolq from src_reg low 256bits */
+        // tls(src_reg low 256bits) -> ymm_spill_sll
+        instr_t *i3 =
+            RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)), OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i4 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i5 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i6 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, dst
+        instr_t *i7 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg low 256bits)
+        instr_t *i8 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+
+        /* second 256 bits vprolq from src_reg high 256bits */
+        // tls(src_reg high 256bits) -> ymm_spill_sll
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // vmovdqu ymm_spill_sll -> ymm_spill_srl
+        instr_t *i10 = INSTR_CREATE_vmovdqu(dcontext, op_ymm_srl, op_ymm_sll);
+        // vpsllq left_rotate_imm -> ymm_spill_sll
+        instr_t *i11 =
+            INSTR_CREATE_vpsllq(dcontext, op_ymm_sll, opnd_create_immed_int(left_rotate_imm, OPSZ_1), op_ymm_sll);
+        // vpsrlq right_rotate_imm -> ymm_spill_srl
+        instr_t *i12 =
+            INSTR_CREATE_vpsrlq(dcontext, op_ymm_srl, opnd_create_immed_int(right_rotate_imm, OPSZ_1), op_ymm_srl);
+        // vpor ymm_spill_srl, ymm_spill_sll, ymm_spill_sll
+        instr_t *i13 = INSTR_CREATE_vpor(dcontext, op_ymm_sll, op_ymm_srl, op_ymm_sll);
+        // ymm_spill_sll -> tls(dst_reg high 256bits)
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, ymm_spill_sll,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+        // tls(ymm_spill_sll) -> ymm_spill_sll
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_sll,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_sll)), OPSZ_32);
+        // tls(ymm_spill_srl) -> ymm_spill_srl
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, ymm_spill_srl,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(ymm_spill_srl)), OPSZ_32);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16);
+#endif
+        instrlist_concat_next_instr(ilist, 16, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16);
+        return i1;
+    } break;
+    default: REWRITE_ERROR(STD_ERRF, "vprorq zmm and immed spill flag not support"); return NULL_INSTR;
+    }
     return NULL_INSTR;
 }
 
@@ -36817,36 +42814,11 @@ vpxord_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
                 return i1;
             } break;
             case 1: { /* src1==src2 needs spill */
-                // src1 == src2, result is 0, dst doesn't need spill
-                // vpxor dst_reg, dst_reg, dst_reg - clear dst to 0
-                instr_t *i1 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(dst_reg),
-                                                 opnd_create_reg(dst_reg));
-#ifdef DEBUG
-                print_rewrite_variadic_instr(dcontext, 1, i1);
-#endif
-                return i1;
+
             } break;
-            case 2: { /* dst needs spill */
-                // src1 == src2 (no spill), dst needs spill, result is 0
-                reg_id_t spill_dst_reg = find_one_available_spill_xmm(dst_reg);
-                // spill_dst_reg -> tls_slot(spill_dst_reg)
-                instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                                     TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-                // vpxor spill_dst_reg, spill_dst_reg, spill_dst_reg - clear to 0
-                instr_t *i2 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(spill_dst_reg),
-                                                 opnd_create_reg(spill_dst_reg), opnd_create_reg(spill_dst_reg));
-                // spill_dst_reg -> tls_slot(dst_reg)
-                instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                                     TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-                // tls_slot(spill_dst_reg) -> spill_dst_reg
-                instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                          TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-#ifdef DEBUG
-                print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
-#endif
-                instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
-                return i1;
-            } break;
+            case 2: {
+
+            } break; /* src1==src2 needs spill, dst needs spill */
             default: REWRITE_ERROR(STD_ERRF, "vpxord pattern not support");
             }
         }
@@ -36869,194 +42841,25 @@ vpxord_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
             return i1;
         } break;
         case 1: { /* src1 needs spill */
-            reg_id_t spill_src1_reg = find_one_available_spill_xmm(src1_reg);
-            // spill_src1_reg -> tls_slot(spill_src1_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // tls_slot(src1_reg) -> spill_src1_reg
-            instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
-            // vpxor spill_src1_reg, src2_reg -> dst_reg
-            instr_t *i3 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(spill_src1_reg),
-                                             opnd_create_reg(src2_reg));
-            // tls_slot(spill_src1_reg) -> spill_src1_reg
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
-#endif
-            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
-            return i1;
+
         } break;
         case 2: { /* src2 needs spill */
-            reg_id_t spill_src2_reg = find_one_available_spill_xmm(src2_reg);
-            // spill_src2_reg -> tls_slot(spill_src2_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-            // tls_slot(src2_reg) -> spill_src2_reg
-            instr_t *i2 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
-            // vpxor src1_reg, spill_src2_reg -> dst_reg
-            instr_t *i3 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(src1_reg),
-                                             opnd_create_reg(spill_src2_reg));
-            // tls_slot(spill_src2_reg) -> spill_src2_reg
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
-#endif
-            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
-            return i1;
+
         } break;
         case 3: { /* src1, src2 spill, dst not spill */
-            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
-            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(spill_src1_reg, dst_reg, DR_REG_NULL);
-            // spill_src1_reg -> tls_slot(spill_src1_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // spill_src2_reg -> tls_slot(spill_src2_reg)
-            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-            // tls_slot(src1_reg) -> spill_src1_reg
-            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
-            // tls_slot(src2_reg) -> spill_src2_reg
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
-            // vpxor spill_src1_reg, spill_src2_reg -> dst_reg
-            instr_t *i5 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(dst_reg), opnd_create_reg(spill_src1_reg),
-                                             opnd_create_reg(spill_src2_reg));
-            // tls_slot(spill_src1_reg) -> spill_src1_reg
-            instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // tls_slot(spill_src2_reg) -> spill_src2_reg
-            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
-#endif
-            instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
-            return i1;
+
         } break;
         case 4: { /* dst needs spill */
-            reg_id_t spill_dst_reg = find_one_available_spill_xmm(dst_reg);
-            // spill_dst_reg -> tls_slot(spill_dst_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-            // vpxor src1_reg, src2_reg -> spill_dst_reg
-            instr_t *i2 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(spill_dst_reg), opnd_create_reg(src1_reg),
-                                             opnd_create_reg(src2_reg));
-            // spill_dst_reg -> tls_slot(dst_reg)
-            instr_t *i3 =
-                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-            // tls_slot(spill_dst_reg) -> spill_dst_reg
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
-#endif
-            instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
-            return i1;
+
         } break;
         case 5: { /* src1 need spill, dst need spill */
-            reg_id_t spill_src1_reg = find_available_spill_xmm_avoiding(src2_reg, dst_reg, DR_REG_NULL);
-            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src1_reg, spill_src1_reg, DR_REG_NULL);
-            // spill_src1_reg -> tls_slot(spill_src1_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // spill_dst_reg -> tls_slot(spill_dst_reg)
-            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-            // tls_slot(src1_reg) -> spill_src1_reg
-            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
-            // vpxor spill_src1_reg, src2_reg -> spill_dst_reg
-            instr_t *i4 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(spill_dst_reg), opnd_create_reg(spill_src1_reg),
-                                             opnd_create_reg(src2_reg));
-            // spill_dst_reg -> tls_slot(dst_reg)
-            instr_t *i5 =
-                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-            // tls_slot(spill_src1_reg) -> spill_src1_reg
-            instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // tls_slot(spill_dst_reg) -> spill_dst_reg
-            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
-#endif
-            instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
-            return i1;
+
         } break;
         case 6: { /* src2 need spill, dst need spill */
-            reg_id_t spill_src2_reg = find_available_spill_xmm_avoiding(src1_reg, dst_reg, DR_REG_NULL);
-            reg_id_t spill_dst_reg = find_available_spill_xmm_avoiding(src2_reg, spill_src2_reg, DR_REG_NULL);
-            // spill_src2_reg -> tls_slot(spill_src2_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-            // spill_dst_reg -> tls_slot(spill_dst_reg)
-            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-            // tls_slot(src2_reg) -> spill_src2_reg
-            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
-            // vpxor src1_reg, spill_src2_reg -> spill_dst_reg
-            instr_t *i4 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(spill_dst_reg), opnd_create_reg(src1_reg),
-                                             opnd_create_reg(spill_src2_reg));
-            // spill_dst_reg -> tls_slot(dst_reg)
-            instr_t *i5 =
-                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-            // tls_slot(spill_src2_reg) -> spill_src2_reg
-            instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-            // tls_slot(spill_dst_reg) -> spill_dst_reg
-            instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
-#endif
-            instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
-            return i1;
+
         } break;
         case 7: { /* src1 need spill, src2 need spill, dst need spill */
-            reg_id_t spill_src1_reg = XMM_SPILL_SLOT0;
-            reg_id_t spill_src2_reg = XMM_SPILL_SLOT1;
-            reg_id_t spill_dst_reg = XMM_SPILL_SLOT2;
-            // spill_src1_reg -> tls_slot(spill_src1_reg)
-            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // spill_src2_reg -> tls_slot(spill_src2_reg)
-            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-            // spill_dst_reg -> tls_slot(spill_dst_reg)
-            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg,
-                                                 TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-            // tls_slot(src1_reg) -> spill_src1_reg
-            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src1_reg)), OPSZ_16);
-            // tls_slot(src2_reg) -> spill_src2_reg
-            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(src2_reg)), OPSZ_16);
-            // vpxor spill_src1_reg, spill_src2_reg -> spill_dst_reg
-            instr_t *i6 = INSTR_CREATE_vpxor(dcontext, opnd_create_reg(spill_dst_reg), opnd_create_reg(spill_src1_reg),
-                                             opnd_create_reg(spill_src2_reg));
-            // spill_dst_reg -> tls_slot(dst_reg)
-            instr_t *i7 =
-                SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_reg, TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(dst_reg)), OPSZ_16);
-            // tls_slot(spill_src1_reg) -> spill_src1_reg
-            instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src1_reg)), OPSZ_16);
-            // tls_slot(spill_src2_reg) -> spill_src2_reg
-            instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_reg,
-                                                      TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_src2_reg)), OPSZ_16);
-            // tls_slot(spill_dst_reg) -> spill_dst_reg
-            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_reg,
-                                                       TLS_ZMM_idx_SLOT(TO_XMM_REG_INDEX(spill_dst_reg)), OPSZ_16);
-#ifdef DEBUG
-            print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
-#endif
-            instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
-            return i1;
+
         } break;
         default: REWRITE_ERROR(STD_ERRF, "vpxord pattern not support");
         }
@@ -37123,12 +42926,609 @@ rw_func_vpxord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
  * ============================================= */
 
 instr_t *
-vpxorq_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src_reg1, reg_id_t src_reg2,
+vpxorq_zmm_and_zmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, reg_id_t src1_reg, reg_id_t src2_reg,
                        reg_id_t dst_reg, reg_id_t mask_reg)
 {
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t src1_reg_lower = DR_REG_NULL;
+    reg_id_t src1_reg_upper = DR_REG_NULL;
+    reg_id_t src2_reg_lower = DR_REG_NULL;
+    reg_id_t src2_reg_upper = DR_REG_NULL;
+    reg_id_t dst_reg_lower = DR_REG_NULL;
+    reg_id_t dst_reg_upper = DR_REG_NULL;
+
+    const uint src1_need_spill = NEED_SPILL_ZMM(src1_reg) ? 1 : 0;
+    const uint src2_need_spill = NEED_SPILL_ZMM(src2_reg) ? 2 : 0;
+    const uint dst_need_spill = NEED_SPILL_ZMM(dst_reg) ? 4 : 0;
+    const uint need_spill = src1_need_spill | src2_need_spill | dst_need_spill;
+
+    switch (need_spill) {
+    case 0: { /* no spill */
+        if (src1_reg == dst_reg) {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = src1_reg_lower;
+            src1_reg_upper = find_available_spill_ymm_avoiding_variadic(2, src1_reg_lower, src2_reg_lower);
+            src2_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, src1_reg_upper);
+            dst_reg_upper = src1_reg_upper;
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i3 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vpsubq
+            instr_t *i5 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i7 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i8 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                      TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "vpxorq zmm zmm, zmm not support");
+            print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
 #endif
+            instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+            return i1;
+        } else {
+            src1_reg_lower = ZMM_TO_YMM(src1_reg);
+            src2_reg_lower = ZMM_TO_YMM(src2_reg);
+            dst_reg_lower = ZMM_TO_YMM(dst_reg);
+            src1_reg_upper =
+                find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+            src2_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                        dst_reg_lower, src1_reg_upper);
+            dst_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                       src1_reg_upper, src2_reg_upper);
+
+            // save src1-up -> tls(src1-up)
+            instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // save src2-up -> tls(src2-up)
+            instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // save dst-up -> tls(dst-up)
+            instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+            // tls(src1-up) -> src1-up
+            instr_t *i4 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src1_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // tls(src2-up) -> src2-up
+            instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(
+                dcontext, src2_reg_upper, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // vpsubq
+            instr_t *i6 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_lower),
+                                                 opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+            instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                                 opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+            // dst-low -> tls(dst-low)
+            instr_t *i8 =
+                SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+            // dst-up -> tls(dst-up)
+            instr_t *i9 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                                 TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+            // restore src1-up from tls(src1-up)
+            instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+            // restore src2-up from tls(src2-up)
+            instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+            // restore dst-up from tls(dst-up)
+            instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                       TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+#endif
+            instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+            return i1;
+        }
+    } break;
+    case 1: { /* src1 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src1 needs special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 2: { /* src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - src2 needs special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i10 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i11 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+#endif
+        instrlist_concat_next_instr(ilist, 15, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15);
+        return i1;
+    } break;
+    case 3: { /* both src1 and src2 need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and src2 need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results
+        instr_t *i12 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i13 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18);
+#endif
+        instrlist_concat_next_instr(ilist, 18, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18);
+        return i1;
+    } break;
+    case 4: { /* dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - dst needs special handling
+        reg_id_t spill_dst_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_dst_lower, src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i4 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load upper parts of source registers
+        instr_t *i5 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i7 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i8 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                             opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i9 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i10 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i11 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i12 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+#endif
+        instrlist_concat_next_instr(ilist, 14, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14);
+        return i1;
+    } break;
+    case 5: { /* both src1 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src1 and dst need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src1_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 upper part
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(spill_src1_lower), opnd_create_reg(src2_reg_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 6: { /* both src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - both src2 and dst need special handling
+        reg_id_t spill_src2_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                              dst_reg_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(5, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(6, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src2_lower, spill_dst_lower, src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src2_lower, spill_dst_lower, src1_reg_upper,
+                                                                   src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i5 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 upper part
+        instr_t *i6 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i9 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(spill_dst_lower),
+                                             opnd_create_reg(src1_reg_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i10 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i11 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i12 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i13 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i14 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17);
+#endif
+        instrlist_concat_next_instr(ilist, 17, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17);
+        return i1;
+    } break;
+    case 7: { /* all src1, src2 and dst need spill */
+        src1_reg_lower = ZMM_TO_YMM(src1_reg);
+        src2_reg_lower = ZMM_TO_YMM(src2_reg);
+        dst_reg_lower = ZMM_TO_YMM(dst_reg);
+
+        // Find spill registers - all registers need special handling
+        reg_id_t spill_src1_lower =
+            find_available_spill_ymm_avoiding_variadic(3, src1_reg_lower, src2_reg_lower, dst_reg_lower);
+        reg_id_t spill_src2_lower = find_available_spill_ymm_avoiding_variadic(4, src1_reg_lower, src2_reg_lower,
+                                                                               dst_reg_lower, spill_src1_lower);
+        reg_id_t spill_dst_lower = find_available_spill_ymm_avoiding_variadic(
+            5, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower);
+        src1_reg_upper = find_available_spill_ymm_avoiding_variadic(
+            6, src1_reg_lower, src2_reg_lower, dst_reg_lower, spill_src1_lower, spill_src2_lower, spill_dst_lower);
+        src2_reg_upper = find_available_spill_ymm_avoiding_variadic(7, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                    spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                    src1_reg_upper);
+        dst_reg_upper = find_available_spill_ymm_avoiding_variadic(8, src1_reg_lower, src2_reg_lower, dst_reg_lower,
+                                                                   spill_src1_lower, spill_src2_lower, spill_dst_lower,
+                                                                   src1_reg_upper, src2_reg_upper);
+
+        // Save spill registers
+        instr_t *i1 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src1_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i2 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_src2_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i3 = SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i4 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src1_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i5 = SAVE_SIMD_TO_SIZED_TLS(dcontext, src2_reg_upper,
+                                             TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i6 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper, TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+        // Load src1 lower and upper parts to spill registers
+        instr_t *i7 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)), OPSZ_32);
+        instr_t *i8 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src1_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Load src2 lower and upper parts to spill registers
+        instr_t *i9 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                  TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)), OPSZ_32);
+        instr_t *i10 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(src2_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Perform operations
+        instr_t *i11 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(spill_dst_lower),
+                                              opnd_create_reg(spill_src1_lower), opnd_create_reg(spill_src2_lower));
+        instr_t *i12 = instr_create_1dst_2src(dcontext, OP_vpxor, opnd_create_reg(dst_reg_upper),
+                                              opnd_create_reg(src1_reg_upper), opnd_create_reg(src2_reg_upper));
+
+        // Store results to dst TLS slots
+        instr_t *i13 =
+            SAVE_SIMD_TO_SIZED_TLS(dcontext, spill_dst_lower, TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)), OPSZ_32);
+        instr_t *i14 = SAVE_SIMD_TO_SIZED_TLS(dcontext, dst_reg_upper,
+                                              TLS_ZMM_idx_SLOT(TO_ZMM_REG_INDEX(dst_reg)) + SIZE_OF_YMM, OPSZ_32);
+
+        // Restore spill registers
+        instr_t *i15 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src1_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src1_lower)), OPSZ_32);
+        instr_t *i16 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_src2_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_src2_lower)), OPSZ_32);
+        instr_t *i17 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, spill_dst_lower,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(spill_dst_lower)), OPSZ_32);
+        instr_t *i18 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src1_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src1_reg_upper)), OPSZ_32);
+        instr_t *i19 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, src2_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(src2_reg_upper)), OPSZ_32);
+        instr_t *i20 = RESTORE_SIMD_FROM_SIZED_TLS(dcontext, dst_reg_upper,
+                                                   TLS_ZMM_idx_SLOT(TO_YMM_REG_INDEX(dst_reg_upper)), OPSZ_32);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15,
+                                     i16, i17, i18, i19, i20);
+#endif
+        instrlist_concat_next_instr(ilist, 20, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16,
+                                    i17, i18, i19, i20);
+        return i1;
+    } break;
+    }
     return NULL_INSTR;
 }
 
@@ -37187,6 +43587,8 @@ vpxorq_xmm_and_xmm_gen(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr,
     } else {
         // unsigned char imm8 = rewrite_reserved_opmask[k_idx];
     }
+    // // TODO: add vpxor and vpblend, there is a problem, vpblendd don't support quadwords, only double words,
+    // // then how to make it corrdinates with vpxorq's quadword,
     return NULL_INSTR;
 }
 
@@ -37398,6 +43800,7 @@ rw_func_vrndscalesd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, ap
     dr_print_opnd(dcontext, STD_OUTF, src_opnd3, "src3:");
     dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "dst:");
 #endif
+    // TODO: change into VEX.LIG.66.0F3A.WIG 0B /r ib VROUNDSD xmm1, xmm2, xmm3/m64, imm8
     ptr_int_t imm8 = opnd_get_immed_int(src_opnd1);
     reg_id_t src_reg1 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
@@ -37438,7 +43841,7 @@ rw_func_vshufi32x4(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app
     opnd_t src2_opnd = instr_get_src(instr, 2);
     opnd_t src3_opnd = instr_get_src(instr, 3);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-#ifdef DEBUG
+#if DEBUG
     REWRITE_INFO(STD_OUTF, "rewrite %s at %p :", "vshufi32x4", instr_start);
     instr_disassemble(dcontext, instr, STD_OUTF);
     NEWLINE(STD_OUTF);
@@ -37454,11 +43857,37 @@ rw_func_vshufi32x4(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app
         instrlist_remove(ilist, instr);
         instr_destroy(dcontext, instr);
         switch (imm8) {
+        case 0x00: {
+            // vshufi32x4 $0x00: low 128 from src2[127:0], high 128 from src3[127:0]
+            opnd_t imm_0x20 = opnd_create_immed_int(0x20, OPSZ_1);
+            instr_t *i1 = instr_create_1dst_3src(dcontext, OP_vperm2i128, dst_opnd, src2_opnd, src3_opnd, imm_0x20);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } break;
+        case 0x01: {
+            // vshufi32x4 $0x01: low 128 from src2[255:128], high 128 from src3[127:0]
+            opnd_t imm_0x21 = opnd_create_immed_int(0x21, OPSZ_1);
+            instr_t *i1 = instr_create_1dst_3src(dcontext, OP_vperm2i128, dst_opnd, src2_opnd, src3_opnd, imm_0x21);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } break;
         case 0x02: {
-            // vshufi32x4 $0x02: low 128 from src2, high 128 from src3[31:16]
-            // vperm2i128 $0x20: low 128 from src1, high 128 from src2[31:16]
+            // vshufi32x4 $0x02: low 128 from src2[127:0], high 128 from src3[255:128]
             opnd_t imm_0x30 = opnd_create_immed_int(0x30, OPSZ_1);
             instr_t *i1 = instr_create_1dst_3src(dcontext, OP_vperm2i128, dst_opnd, src2_opnd, src3_opnd, imm_0x30);
+#ifdef DEBUG
+            print_rewrite_variadic_instr(dcontext, 1, i1);
+#endif
+            return i1;
+        } break;
+        case 0x03: {
+            // vshufi32x4 $0x03: low 128 from src2[255:128], high 128 from src3[255:128]
+            opnd_t imm_0x31 = opnd_create_immed_int(0x31, OPSZ_1);
+            instr_t *i1 = instr_create_1dst_3src(dcontext, OP_vperm2i128, dst_opnd, src2_opnd, src3_opnd, imm_0x31);
 #ifdef DEBUG
             print_rewrite_variadic_instr(dcontext, 1, i1);
 #endif
@@ -37580,7 +44009,6 @@ rw_func_kmovb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     print_rewrite_info(dcontext, ilist, instr, instr_start, "kmovb", true, false, false, true);
 #endif
     reg_id_t src_reg = opnd_get_reg(src_opnd);
-    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
 
     const uint src_mask_flag = IS_MASK_REG(src_reg) ? 1 : 0;
@@ -37742,7 +44170,7 @@ rw_func_kmovq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
         // so we need to use a gpr as intermediate, mov %gs:offset -> gpr -> %gs:offset
         int src_k_idx = TO_K_REG_INDEX(src_reg);
         int dst_k_idx = TO_K_REG_INDEX(dst_reg);
-        reg_id_t tmp_reg = DR_REG_RAX; // use r11 as intermediate register, 
+        reg_id_t tmp_reg = DR_REG_RAX; // use r11 as intermediate register, TODO: if better reg according to ABI?
         // save tmp reg, spill tmp reg
         new_instr1 = SAVE_TO_TLS(dcontext, tmp_reg, TLS_REG1_SLOT);
         // mov %gs:offset -> gpr
@@ -38532,101 +44960,478 @@ rw_func_kunpckdq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_p
     return NULL_INSTR;
 }
 
-/**
- * @brief knot_ template function
- */
-instr_t *
-rw_func_knot_(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
-#ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite knot_ not support");
-#endif
-    return NULL_INSTR;
-}
-
 instr_t * /* 487 */
 rw_func_knotw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // knotw %k1, %k2 - 16-bit K register NOT operation
+    // DEST[15:0] := BITWISE NOT SRC[15:0]
+    // DEST[MAX_KL-1:16] := 0
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite knotw not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting knotw at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask = opnd_get_reg(src_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k_idx = TO_K_REG_INDEX(input_mask);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64 = DR_REG_RAX;
+    reg_id_t spill_gpr16 = DR_REG_AX;
+    opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
+    opnd_t spill_gpr16_opnd = opnd_create_reg(spill_gpr16);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_opnd);
+    // tls_slot(input_mask) -> %ax
+    instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr16, TLS_K_idx_SLOT(input_k_idx), OPSZ_2);
+    // not %ax
+    instr_t *i4 = INSTR_CREATE_not(dcontext, spill_gpr16_opnd);
+    // and $0xffff, %ax (clear higher bits - ensure only lower 16 bits are set)
+    instr_t *i5 = INSTR_CREATE_and(dcontext, spill_gpr16_opnd, OPND_CREATE_INT16(0xffff));
+    // mov %ax, tls_slot(output_mask)
+    instr_t *i6 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr16, TLS_K_idx_SLOT(output_k_idx), OPSZ_2);
+    // pop rax
+    instr_t *i7 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
+    // popfq
+    instr_t *i8 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+    instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+    return i1;
 }
 
 instr_t * /* 488 */
 rw_func_knotb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // knotb %k1, %k2 - 8-bit K register NOT operation
+    // DEST[7:0] := BITWISE NOT SRC[7:0]
+    // DEST[MAX_KL-1:8] := 0
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite knotb not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting knotb at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask = opnd_get_reg(src_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k_idx = TO_K_REG_INDEX(input_mask);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64 = DR_REG_RAX;
+    reg_id_t spill_gpr8 = DR_REG_AL;
+    opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
+    opnd_t spill_gpr8_opnd = opnd_create_reg(spill_gpr8);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_opnd);
+    // tls_slot(input_mask) -> %al
+    instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr8, TLS_K_idx_SLOT(input_k_idx), OPSZ_1);
+    // not %al
+    instr_t *i4 = INSTR_CREATE_not(dcontext, spill_gpr8_opnd);
+    // and $0xff, %al (clear higher bits - ensure only lower 8 bits are set)
+    instr_t *i5 = INSTR_CREATE_and(dcontext, spill_gpr8_opnd, OPND_CREATE_INT8(0xff));
+    // mov %al, tls_slot(output_mask)
+    instr_t *i6 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr8, TLS_K_idx_SLOT(output_k_idx), OPSZ_1);
+    // pop rax
+    instr_t *i7 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
+    // popfq
+    instr_t *i8 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+#endif
+    instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+    return i1;
 }
 
 instr_t * /* 489 */
 rw_func_knotq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // knotq %k1, %k2 - 64-bit K register NOT operation
+    // DEST[63:0] := BITWISE NOT SRC[63:0]
+    // DEST[MAX_KL-1:64] := 0
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite knotq not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting knotq at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask = opnd_get_reg(src_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k_idx = TO_K_REG_INDEX(input_mask);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64 = DR_REG_RAX;
+    opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_opnd);
+    // tls_slot(input_mask) -> %rax
+    instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr64, TLS_K_idx_SLOT(input_k_idx), OPSZ_8);
+    // not %rax
+    instr_t *i4 = INSTR_CREATE_not(dcontext, spill_gpr64_opnd);
+    // mov %rax, tls_slot(output_mask) (no masking needed since k-registers are stored as 64-bit)
+    instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr64, TLS_K_idx_SLOT(output_k_idx), OPSZ_8);
+    // pop rax
+    instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
+    // popfq
+    instr_t *i7 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
+#endif
+    instrlist_concat_next_instr(ilist, 7, i1, i2, i3, i4, i5, i6, i7);
+    return i1;
 }
 
 instr_t * /* 490 */
 rw_func_knotd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // knotd %k1, %k2 - 32-bit K register NOT operation
+    // DEST[31:0] := BITWISE NOT SRC[31:0]
+    // DEST[MAX_KL-1:32] := 0
+    opnd_t src_opnd = instr_get_src(instr, 0);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite knotd not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting knotd at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src_opnd, "input src: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
-}
 
-/**
- * @brief kor_ template function
- *
- */
-instr_t *
-rw_func_kor_(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask = opnd_get_reg(src_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k_idx = TO_K_REG_INDEX(input_mask);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64 = DR_REG_RAX;
+    reg_id_t spill_gpr32 = DR_REG_EAX;
+    opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
+    opnd_t spill_gpr32_opnd = opnd_create_reg(spill_gpr32);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_opnd);
+    // tls_slot(input_mask) -> %eax
+    instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr32, TLS_K_idx_SLOT(input_k_idx), OPSZ_4);
+    // not %eax
+    instr_t *i4 = INSTR_CREATE_not(dcontext, spill_gpr32_opnd);
+    // and $0xffffffff, %eax (clear higher bits - ensure only lower 32 bits are set)
+    instr_t *i5 = INSTR_CREATE_and(dcontext, spill_gpr32_opnd, OPND_CREATE_INT32(0xffffffff));
+    // mov %eax, tls_slot(output_mask)
+    instr_t *i6 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr32, TLS_K_idx_SLOT(output_k_idx), OPSZ_4);
+    // pop rax
+    instr_t *i7 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
+    // popfq
+    instr_t *i8 = INSTR_CREATE_popf(dcontext);
+
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite kor_ not support");
+    print_rewrite_variadic_instr(dcontext, 8, i1, i2, i3, i4, i5, i6, i7, i8);
 #endif
-    return NULL_INSTR;
+    instrlist_concat_next_instr(ilist, 8, i1, i2, i3, i4, i5, i6, i7, i8);
+    return i1;
 }
 
 instr_t * /* 491 */
 rw_func_korw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // korw %k1, %k2, %k3 - 16-bit K register OR operation
+    // DEST[15:0] := SRC1[15:0] BITWISE OR SRC2[15:0]
+    // DEST[MAX_KL-1:16] := 0
+    opnd_t src1_opnd = instr_get_src(instr, 0);
+    opnd_t src2_opnd = instr_get_src(instr, 1);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite korw not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting korw at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src1_opnd, "input src1: ");
+    dr_print_opnd(dcontext, STD_OUTF, src2_opnd, "input src2: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask1 = opnd_get_reg(src1_opnd);
+    reg_id_t input_mask2 = opnd_get_reg(src2_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k1_idx = TO_K_REG_INDEX(input_mask1);
+    uint input_k2_idx = TO_K_REG_INDEX(input_mask2);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64_1 = DR_REG_RAX;
+    reg_id_t spill_gpr64_2 = DR_REG_RBX;
+    reg_id_t spill_gpr16_1 = DR_REG_AX;
+    reg_id_t spill_gpr16_2 = DR_REG_BX;
+
+    opnd_t spill_gpr64_1_opnd = opnd_create_reg(spill_gpr64_1);
+    opnd_t spill_gpr64_2_opnd = opnd_create_reg(spill_gpr64_2);
+    opnd_t spill_gpr16_1_opnd = opnd_create_reg(spill_gpr16_1);
+    opnd_t spill_gpr16_2_opnd = opnd_create_reg(spill_gpr16_2);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_1_opnd);
+    // push rbx
+    instr_t *i3 = INSTR_CREATE_push(dcontext, spill_gpr64_2_opnd);
+    // tls_slot(input_mask1) -> %ax
+    instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr16_1, TLS_K_idx_SLOT(input_k1_idx), OPSZ_2);
+    // tls_slot(input_mask2) -> %bx
+    instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr16_2, TLS_K_idx_SLOT(input_k2_idx), OPSZ_2);
+    // or %bx, %ax
+    instr_t *i6 = INSTR_CREATE_or(dcontext, spill_gpr16_1_opnd, spill_gpr16_2_opnd);
+    // and $0xffff, %ax (clear higher bits - ensure only lower 16 bits are set)
+    instr_t *i7 = INSTR_CREATE_and(dcontext, spill_gpr16_1_opnd, OPND_CREATE_INT16(0xffff));
+    // mov %ax, tls_slot(output_mask)
+    instr_t *i8 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr16_1, TLS_K_idx_SLOT(output_k_idx), OPSZ_2);
+    // pop rbx
+    instr_t *i9 = INSTR_CREATE_pop(dcontext, spill_gpr64_2_opnd);
+    // pop rax
+    instr_t *i10 = INSTR_CREATE_pop(dcontext, spill_gpr64_1_opnd);
+    // popfq
+    instr_t *i11 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+#endif
+    instrlist_concat_next_instr(ilist, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+    return i1;
 }
 
 instr_t * /* 492 */
 rw_func_korb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // korb %k1, %k2, %k3 - 8-bit K register OR operation
+    // DEST[7:0] := SRC1[7:0] BITWISE OR SRC2[7:0]
+    // DEST[MAX_KL-1:8] := 0
+    opnd_t src1_opnd = instr_get_src(instr, 0);
+    opnd_t src2_opnd = instr_get_src(instr, 1);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite korb not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting korb at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src1_opnd, "input src1: ");
+    dr_print_opnd(dcontext, STD_OUTF, src2_opnd, "input src2: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask1 = opnd_get_reg(src1_opnd);
+    reg_id_t input_mask2 = opnd_get_reg(src2_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k1_idx = TO_K_REG_INDEX(input_mask1);
+    uint input_k2_idx = TO_K_REG_INDEX(input_mask2);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64_1 = DR_REG_RAX;
+    reg_id_t spill_gpr64_2 = DR_REG_RBX;
+    reg_id_t spill_gpr8_1 = DR_REG_AL;
+    reg_id_t spill_gpr8_2 = DR_REG_BL;
+
+    opnd_t spill_gpr64_1_opnd = opnd_create_reg(spill_gpr64_1);
+    opnd_t spill_gpr64_2_opnd = opnd_create_reg(spill_gpr64_2);
+    opnd_t spill_gpr8_1_opnd = opnd_create_reg(spill_gpr8_1);
+    opnd_t spill_gpr8_2_opnd = opnd_create_reg(spill_gpr8_2);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_1_opnd);
+    // push rbx
+    instr_t *i3 = INSTR_CREATE_push(dcontext, spill_gpr64_2_opnd);
+    // tls_slot(input_mask1) -> %al
+    instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr8_1, TLS_K_idx_SLOT(input_k1_idx), OPSZ_1);
+    // tls_slot(input_mask2) -> %bl
+    instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr8_2, TLS_K_idx_SLOT(input_k2_idx), OPSZ_1);
+    // or %bl, %al
+    instr_t *i6 = INSTR_CREATE_or(dcontext, spill_gpr8_1_opnd, spill_gpr8_2_opnd);
+    // and $0xff, %al (clear higher bits - ensure only lower 8 bits are set)
+    instr_t *i7 = INSTR_CREATE_and(dcontext, spill_gpr8_1_opnd, OPND_CREATE_INT8(0xff));
+    // mov %al, tls_slot(output_mask)
+    instr_t *i8 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr8_1, TLS_K_idx_SLOT(output_k_idx), OPSZ_1);
+    // pop rbx
+    instr_t *i9 = INSTR_CREATE_pop(dcontext, spill_gpr64_2_opnd);
+    // pop rax
+    instr_t *i10 = INSTR_CREATE_pop(dcontext, spill_gpr64_1_opnd);
+    // popfq
+    instr_t *i11 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+#endif
+    instrlist_concat_next_instr(ilist, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+    return i1;
 }
 
 instr_t * /* 493 */
 rw_func_korq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // korq %k1, %k2, %k3 - 64-bit K register OR operation
+    // DEST[63:0] := SRC1[63:0] BITWISE OR SRC2[63:0]
+    // DEST[MAX_KL-1:64] := 0
+    opnd_t src1_opnd = instr_get_src(instr, 0);
+    opnd_t src2_opnd = instr_get_src(instr, 1);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite korq not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting korq at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src1_opnd, "input src1: ");
+    dr_print_opnd(dcontext, STD_OUTF, src2_opnd, "input src2: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask1 = opnd_get_reg(src1_opnd);
+    reg_id_t input_mask2 = opnd_get_reg(src2_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k1_idx = TO_K_REG_INDEX(input_mask1);
+    uint input_k2_idx = TO_K_REG_INDEX(input_mask2);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64_1 = DR_REG_RAX;
+    reg_id_t spill_gpr64_2 = DR_REG_RBX;
+
+    opnd_t spill_gpr64_1_opnd = opnd_create_reg(spill_gpr64_1);
+    opnd_t spill_gpr64_2_opnd = opnd_create_reg(spill_gpr64_2);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_1_opnd);
+    // push rbx
+    instr_t *i3 = INSTR_CREATE_push(dcontext, spill_gpr64_2_opnd);
+    // tls_slot(input_mask1) -> %rax
+    instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr64_1, TLS_K_idx_SLOT(input_k1_idx), OPSZ_8);
+    // tls_slot(input_mask2) -> %rbx
+    instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr64_2, TLS_K_idx_SLOT(input_k2_idx), OPSZ_8);
+    // or %rbx, %rax
+    instr_t *i6 = INSTR_CREATE_or(dcontext, spill_gpr64_1_opnd, spill_gpr64_2_opnd);
+    // mov %rax, tls_slot(output_mask) (no masking needed since k-registers are stored as 64-bit)
+    instr_t *i7 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr64_1, TLS_K_idx_SLOT(output_k_idx), OPSZ_8);
+    // pop rbx
+    instr_t *i8 = INSTR_CREATE_pop(dcontext, spill_gpr64_2_opnd);
+    // pop rax
+    instr_t *i9 = INSTR_CREATE_pop(dcontext, spill_gpr64_1_opnd);
+    // popfq
+    instr_t *i10 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+#endif
+    instrlist_concat_next_instr(ilist, 10, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10);
+    return i1;
 }
 
 instr_t * /* 494 */
 rw_func_kord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
 {
+    // kord %k1, %k2, %k3 - 32-bit K register OR operation
+    // DEST[31:0] := SRC1[31:0] BITWISE OR SRC2[31:0]
+    // DEST[MAX_KL-1:32] := 0
+    opnd_t src1_opnd = instr_get_src(instr, 0);
+    opnd_t src2_opnd = instr_get_src(instr, 1);
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
 #ifdef DEBUG
-    REWRITE_ERROR(STD_ERRF, "rewrite kord not support");
+    REWRITE_INFO(STD_OUTF, "==== Rewriting kord at %p ====", instr_start);
+    instr_disassemble(dcontext, instr, STD_OUTF);
+    NEWLINE(STD_OUTF);
+    dr_print_opnd(dcontext, STD_OUTF, src1_opnd, "input src1: ");
+    dr_print_opnd(dcontext, STD_OUTF, src2_opnd, "input src2: ");
+    dr_print_opnd(dcontext, STD_OUTF, dst_opnd, "output dst: ");
 #endif
-    return NULL_INSTR;
+
+    instrlist_remove(ilist, instr);
+    instr_destroy(dcontext, instr);
+
+    reg_id_t input_mask1 = opnd_get_reg(src1_opnd);
+    reg_id_t input_mask2 = opnd_get_reg(src2_opnd);
+    reg_id_t output_mask = opnd_get_reg(dst_opnd);
+    uint input_k1_idx = TO_K_REG_INDEX(input_mask1);
+    uint input_k2_idx = TO_K_REG_INDEX(input_mask2);
+    uint output_k_idx = TO_K_REG_INDEX(output_mask);
+
+    reg_id_t spill_gpr64_1 = DR_REG_RAX;
+    reg_id_t spill_gpr64_2 = DR_REG_RBX;
+    reg_id_t spill_gpr32_1 = DR_REG_EAX;
+    reg_id_t spill_gpr32_2 = DR_REG_EBX;
+
+    opnd_t spill_gpr64_1_opnd = opnd_create_reg(spill_gpr64_1);
+    opnd_t spill_gpr64_2_opnd = opnd_create_reg(spill_gpr64_2);
+    opnd_t spill_gpr32_1_opnd = opnd_create_reg(spill_gpr32_1);
+    opnd_t spill_gpr32_2_opnd = opnd_create_reg(spill_gpr32_2);
+
+    // pushfq
+    instr_t *i1 = INSTR_CREATE_pushf(dcontext);
+    // push rax
+    instr_t *i2 = INSTR_CREATE_push(dcontext, spill_gpr64_1_opnd);
+    // push rbx
+    instr_t *i3 = INSTR_CREATE_push(dcontext, spill_gpr64_2_opnd);
+    // tls_slot(input_mask1) -> %eax
+    instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr32_1, TLS_K_idx_SLOT(input_k1_idx), OPSZ_4);
+    // tls_slot(input_mask2) -> %ebx
+    instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr32_2, TLS_K_idx_SLOT(input_k2_idx), OPSZ_4);
+    // or %ebx, %eax
+    instr_t *i6 = INSTR_CREATE_or(dcontext, spill_gpr32_1_opnd, spill_gpr32_2_opnd);
+    // and $0xffffffff, %eax (clear higher bits - ensure only lower 32 bits are set)
+    instr_t *i7 = INSTR_CREATE_and(dcontext, spill_gpr32_1_opnd, OPND_CREATE_INT32(0xffffffff));
+    // mov %eax, tls_slot(output_mask)
+    instr_t *i8 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr32_1, TLS_K_idx_SLOT(output_k_idx), OPSZ_4);
+    // pop rbx
+    instr_t *i9 = INSTR_CREATE_pop(dcontext, spill_gpr64_2_opnd);
+    // pop rax
+    instr_t *i10 = INSTR_CREATE_pop(dcontext, spill_gpr64_1_opnd);
+    // popfq
+    instr_t *i11 = INSTR_CREATE_popf(dcontext);
+
+#ifdef DEBUG
+    print_rewrite_variadic_instr(dcontext, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+#endif
+    instrlist_concat_next_instr(ilist, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+    return i1;
 }
 
 /**
@@ -38647,101 +45452,24 @@ rw_func_kxnorw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
 #ifdef DEBUG
     print_rewrite_info(dcontext, ilist, instr, instr_start, "kxnorw", true, true, false, true);
 #endif
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
-    if (src_reg1 == src_reg2) { // if kxnor_ operate on same register, then directly assign all 1s to the dst opnd
+
+    int k_dst_idx = TO_K_REG_INDEX(dst_reg);
+
+    reg_id_t reg_rax = DR_REG_RAX;
+    opnd_t op_rax = opnd_create_reg(reg_rax);
+
+    if (src_reg1 == src_reg2) {
         instrlist_remove(ilist, instr);
         instr_destroy(dcontext, instr);
-
-        reg_id_t reg_rax = DR_REG_RAX;
-        opnd_t op_rax = opnd_create_reg(reg_rax);
-        // kxnorw %k1,%k1,%k1
-        // (gdb) p/x $k1
-        // $2 = 0xffff
-        int k_idx = TO_K_REG_INDEX(src_reg1);
-        // push rax
         instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
-        // mov 0x00ffff %rax
         instr_t *i2 = INSTR_CREATE_mov_imm(dcontext, op_rax, OPND_CREATE_INT64(0x000000000000ffff));
-        // mov %rax tls_slot(k1)
-        instr_t *i3 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_idx));
-        // pop rax
-        instr_t *i4 = INSTR_CREATE_pop(dcontext, op_rax);
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
-#endif
-        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
-        return i1;
-    }
-    return NULL_INSTR;
-}
-
-instr_t * /* 496 */
-rw_func_kxnorb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
-    // kxnorb %k1 %k1 -> %k1, same 1, diff 0
-#ifdef DEBUG
-    print_rewrite_info(dcontext, ilist, instr, instr_start, "kxnorw", true, true, false, true);
-#endif
-    opnd_t src_opnd1 = instr_get_src(instr, 0);
-    opnd_t src_opnd2 = instr_get_src(instr, 1);
-    reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
-    reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
-    if (src_reg1 == src_reg2) { // if kxnor_ operate on same register, then directly assign all 1s to the dst opnd
-        instrlist_remove(ilist, instr);
-        instr_destroy(dcontext, instr);
-        // kxnorb %k1,%k1,%k1
-        // (gdb) p/x $k1
-        //  $2 = 0xff
-
-        reg_id_t reg_rax = DR_REG_RAX;
-        opnd_t op_rax = opnd_create_reg(reg_rax);
-        int k_idx = TO_K_REG_INDEX(src_reg1);
-        // push rax
-        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
-        // mov 0x0000ff %rax
-        instr_t *i2 = INSTR_CREATE_mov_imm(dcontext, op_rax, OPND_CREATE_INT64(0x00000000000000ff));
-        // mov %rax tls_slot(k1)
-        instr_t *i3 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_idx));
-        // pop rax
-        instr_t *i4 = INSTR_CREATE_pop(dcontext, op_rax);
-#ifdef DEBUG
-        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
-#endif
-        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
-        return i1;
-    }
-    return NULL_INSTR;
-}
-
-instr_t * /* 497 */
-rw_func_kxnorq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
-{
-#ifdef DEBUG
-    print_rewrite_info(dcontext, ilist, instr, instr_start, "kxnorw", true, true, false, true);
-#endif
-    opnd_t src_opnd1 = instr_get_src(instr, 0);
-    opnd_t src_opnd2 = instr_get_src(instr, 1);
-    reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
-    reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
-    if (src_reg1 == src_reg2) { // if kxnor_ operate on same register, then directly assign all 1s to the dst opnd
-        instrlist_remove(ilist, instr);
-        instr_destroy(dcontext, instr);
-        // kxnorw %k1,%k1,%k1
-        // (gdb) p/x $k1
-        // $3 = 0xffffffffffffffff
-        int k_idx = TO_K_REG_INDEX(src_reg1);
-        reg_id_t reg_rax = DR_REG_RAX;
-        opnd_t op_rax = opnd_create_reg(reg_rax);
-        // push rax
-        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
-        // mov 0xffffffffffffffff rax
-        instr_t *i2 = INSTR_CREATE_mov_imm(dcontext, op_rax, OPND_CREATE_INT64(0xffffffffffffffff));
-        // mov rax tls_slot(k1)
-        instr_t *i3 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_idx));
-        // pop rax
+        instr_t *i3 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
         instr_t *i4 = INSTR_CREATE_pop(dcontext, op_rax);
 #ifdef DEBUG
         print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
@@ -38749,12 +45477,181 @@ rw_func_kxnorq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
         return i1;
     } else {
+        // [Impl] kxnorw src1 != src2
+        instrlist_remove(ilist, instr);
+        instr_destroy(dcontext, instr);
+
+        reg_id_t reg_rcx = DR_REG_RCX;
+        opnd_t op_rcx = opnd_create_reg(reg_rcx);
+        int k_src1_idx = TO_K_REG_INDEX(src_reg1);
+        int k_src2_idx = TO_K_REG_INDEX(src_reg2);
+
+        // 1. Save Registers
+        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
+        instr_t *i2 = INSTR_CREATE_push(dcontext, op_rcx);
+        // 2. Save EFLAGS (Critical: XOR/AND modify flags)
+        instr_t *i3 = INSTR_CREATE_pushf(dcontext);
+
+        // 3. Load src1 -> RAX, src2 -> RCX
+        instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rax, TLS_K_idx_SLOT(k_src1_idx), OPSZ_8);
+        instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rcx, TLS_K_idx_SLOT(k_src2_idx), OPSZ_8);
+
+        // 4. XOR RAX, RCX (Modifies flags)
+        instr_t *i6 = INSTR_CREATE_xor(dcontext, op_rax, op_rcx);
+
+        // 5. NOT RAX (Does not modify flags, but good to be safe with context)
+        instr_t *i7 = INSTR_CREATE_not(dcontext, op_rax);
+
+        // 6. Mask to 16 bits (AND RAX, 0xFFFF) (Modifies flags)
+        instr_t *i8 = INSTR_CREATE_and(dcontext, op_rax, OPND_CREATE_INT32(0xFFFF));
+
+        // 7. Store Result -> dst
+        instr_t *i9 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
+
+        // 8. Restore EFLAGS
+        instr_t *i10 = INSTR_CREATE_popf(dcontext);
+        // 9. Restore Registers
+        instr_t *i11 = INSTR_CREATE_pop(dcontext, op_rcx);
+        instr_t *i12 = INSTR_CREATE_pop(dcontext, op_rax);
+
 #ifdef DEBUG
-        REWRITE_INFO(STD_OUTF, "kxnorq src1 != src2 not implemented\n");
+        print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
 #endif
-        return NULL_INSTR;
+        instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+        return i1;
     }
-    return NULL_INSTR;
+}
+
+instr_t * /* 496 */
+rw_func_kxnorb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "kxnorb", true, true, false, true);
+#endif
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
+    opnd_t src_opnd1 = instr_get_src(instr, 0);
+    opnd_t src_opnd2 = instr_get_src(instr, 1);
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
+    reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
+    reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
+    int k_dst_idx = TO_K_REG_INDEX(dst_reg);
+
+    reg_id_t reg_rax = DR_REG_RAX;
+    opnd_t op_rax = opnd_create_reg(reg_rax);
+
+    if (src_reg1 == src_reg2) {
+        instrlist_remove(ilist, instr);
+        instr_destroy(dcontext, instr);
+
+        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
+        instr_t *i2 = INSTR_CREATE_mov_imm(dcontext, op_rax, OPND_CREATE_INT64(0x00000000000000ff));
+        instr_t *i3 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
+        instr_t *i4 = INSTR_CREATE_pop(dcontext, op_rax);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } else {
+        // [Impl] kxnorb src1 != src2
+        instrlist_remove(ilist, instr);
+        instr_destroy(dcontext, instr);
+
+        reg_id_t reg_rcx = DR_REG_RCX;
+        opnd_t op_rcx = opnd_create_reg(reg_rcx);
+        int k_src1_idx = TO_K_REG_INDEX(src_reg1);
+        int k_src2_idx = TO_K_REG_INDEX(src_reg2);
+
+        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
+        instr_t *i2 = INSTR_CREATE_push(dcontext, op_rcx);
+        instr_t *i3 = INSTR_CREATE_pushf(dcontext); // Save Flags
+
+        instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rax, TLS_K_idx_SLOT(k_src1_idx), OPSZ_8);
+        instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rcx, TLS_K_idx_SLOT(k_src2_idx), OPSZ_8);
+
+        instr_t *i6 = INSTR_CREATE_xor(dcontext, op_rax, op_rcx);
+        instr_t *i7 = INSTR_CREATE_not(dcontext, op_rax);
+
+        // Mask to 8 bits
+        instr_t *i8 = INSTR_CREATE_and(dcontext, op_rax, OPND_CREATE_INT32(0xFF));
+
+        instr_t *i9 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
+
+        instr_t *i10 = INSTR_CREATE_popf(dcontext); // Restore Flags
+        instr_t *i11 = INSTR_CREATE_pop(dcontext, op_rcx);
+        instr_t *i12 = INSTR_CREATE_pop(dcontext, op_rax);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+#endif
+        instrlist_concat_next_instr(ilist, 12, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12);
+        return i1;
+    }
+}
+
+instr_t * /* 497 */
+rw_func_kxnorq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc instr_start)
+{
+#ifdef DEBUG
+    print_rewrite_info(dcontext, ilist, instr, instr_start, "kxnorq", true, true, false, true);
+#endif
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
+    opnd_t src_opnd1 = instr_get_src(instr, 0);
+    opnd_t src_opnd2 = instr_get_src(instr, 1);
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
+    reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
+    reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
+    int k_dst_idx = TO_K_REG_INDEX(dst_reg);
+
+    reg_id_t reg_rax = DR_REG_RAX;
+    opnd_t op_rax = opnd_create_reg(reg_rax);
+
+    if (src_reg1 == src_reg2) {
+        instrlist_remove(ilist, instr);
+        instr_destroy(dcontext, instr);
+
+        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
+        instr_t *i2 = INSTR_CREATE_mov_imm(dcontext, op_rax, OPND_CREATE_INT64(0xffffffffffffffff));
+        instr_t *i3 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
+        instr_t *i4 = INSTR_CREATE_pop(dcontext, op_rax);
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 4, i1, i2, i3, i4);
+#endif
+        instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
+        return i1;
+    } else {
+        // [Impl] kxnorq src1 != src2
+        instrlist_remove(ilist, instr);
+        instr_destroy(dcontext, instr);
+
+        reg_id_t reg_rcx = DR_REG_RCX;
+        opnd_t op_rcx = opnd_create_reg(reg_rcx);
+        int k_src1_idx = TO_K_REG_INDEX(src_reg1);
+        int k_src2_idx = TO_K_REG_INDEX(src_reg2);
+
+        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
+        instr_t *i2 = INSTR_CREATE_push(dcontext, op_rcx);
+        instr_t *i3 = INSTR_CREATE_pushf(dcontext); // Save Flags
+
+        instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rax, TLS_K_idx_SLOT(k_src1_idx), OPSZ_8);
+        instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rcx, TLS_K_idx_SLOT(k_src2_idx), OPSZ_8);
+
+        instr_t *i6 = INSTR_CREATE_xor(dcontext, op_rax, op_rcx);
+        instr_t *i7 = INSTR_CREATE_not(dcontext, op_rax);
+
+        // No masking needed for q (64-bit)
+        instr_t *i8 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
+
+        instr_t *i9 = INSTR_CREATE_popf(dcontext); // Restore Flags
+        instr_t *i10 = INSTR_CREATE_pop(dcontext, op_rcx);
+        instr_t *i11 = INSTR_CREATE_pop(dcontext, op_rax);
+
+#ifdef DEBUG
+        print_rewrite_variadic_instr(dcontext, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+#endif
+        instrlist_concat_next_instr(ilist, 11, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11);
+        return i1;
+    }
 }
 
 instr_t * /* 498 */
@@ -38763,10 +45660,17 @@ rw_func_kxnord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
 #ifdef DEBUG
     print_rewrite_info(dcontext, ilist, instr, instr_start, "kxnorw", true, true, false, true);
 #endif
+    opnd_t dst_opnd = instr_get_dst(instr, 0);
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
+    reg_id_t dst_reg = opnd_get_reg(dst_opnd);
+    int k_dst_idx = TO_K_REG_INDEX(dst_reg);
+
+    reg_id_t reg_rax = DR_REG_RAX;
+    opnd_t op_rax = opnd_create_reg(reg_rax);
+
     if (src_reg1 == src_reg2) { // if kxnor_ operate on same register, then directly assign all 1s to the dst opnd
         instrlist_remove(ilist, instr);
         instr_destroy(dcontext, instr);
@@ -38774,8 +45678,6 @@ rw_func_kxnord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         // (gdb) p/x $k1
         // $3 = 0xffffffff
 
-        reg_id_t reg_rax = DR_REG_RAX;
-        opnd_t op_rax = opnd_create_reg(reg_rax);
         int k_idx = TO_K_REG_INDEX(src_reg1);
         // push rax
         instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
@@ -38791,9 +45693,38 @@ rw_func_kxnord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc 
         instrlist_concat_next_instr(ilist, 4, i1, i2, i3, i4);
         return i1;
     } else {
+        reg_id_t reg_rcx = DR_REG_RCX;
+        opnd_t op_rcx = opnd_create_reg(reg_rcx);
+
+        int k_src1_idx = TO_K_REG_INDEX(src_reg1);
+        int k_src2_idx = TO_K_REG_INDEX(src_reg2);
+
+        instr_t *i1 = INSTR_CREATE_push(dcontext, op_rax);
+        instr_t *i2 = INSTR_CREATE_push(dcontext, op_rcx);
+        instr_t *i3 = INSTR_CREATE_pushf(dcontext); // Save Flags
+
+        instr_t *i4 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rax, TLS_K_idx_SLOT(k_src1_idx), OPSZ_8);
+        instr_t *i5 = RESTORE_FROM_SIZED_TLS(dcontext, reg_rcx, TLS_K_idx_SLOT(k_src2_idx), OPSZ_8);
+
+        instr_t *i6 = INSTR_CREATE_xor(dcontext, op_rax, op_rcx);
+        instr_t *i7 = INSTR_CREATE_not(dcontext, op_rax);
+
+        // Mask to 32 bits.
+        // We use RCX for the mask to avoid potential sign-extension ambiguity with immediate ops on 64-bit Reg
+        instr_t *i8 = INSTR_CREATE_mov_imm(dcontext, op_rcx, OPND_CREATE_INT64(0x00000000FFFFFFFF));
+        instr_t *i9 = INSTR_CREATE_and(dcontext, op_rax, op_rcx);
+
+        instr_t *i10 = SAVE_TO_TLS(dcontext, DR_REG_RAX, TLS_K_idx_SLOT(k_dst_idx));
+
+        instr_t *i11 = INSTR_CREATE_popf(dcontext); // Restore Flags
+        instr_t *i12 = INSTR_CREATE_pop(dcontext, op_rcx);
+        instr_t *i13 = INSTR_CREATE_pop(dcontext, op_rax);
+
 #ifdef DEBUG
-        REWRITE_INFO(STD_OUTF, "kxnord src1 != src2 not implmented\n");
+        print_rewrite_variadic_instr(dcontext, 13, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13);
 #endif
+        instrlist_concat_next_instr(ilist, 13, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13);
+        return i1;
     }
     return NULL_INSTR;
 }
@@ -38819,23 +45750,23 @@ rw_func_kxorw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     reg_id_t spill_gpr16 = DR_REG_AX;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
     opnd_t spill_gpr16_opnd = opnd_create_reg(spill_gpr16);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -38843,15 +45774,15 @@ rw_func_kxorw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %ax
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr16, TLS_K_idx_SLOT(src1_k_idx), OPSZ_2);
     // xor tls_slot(src2_k_idx), %ax
-    instr_t *i4 = INSTR_CREATE_xor(dcontext, spill_gpr16_opnd, 
-                                  OPND_CREATE_MEM16(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_xor(dcontext, spill_gpr16_opnd, OPND_CREATE_MEM16(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %ax, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr16, TLS_K_idx_SLOT(dst_k_idx), OPSZ_2);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -38868,23 +45799,23 @@ rw_func_kxorb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     reg_id_t spill_gpr8 = DR_REG_AL;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
     opnd_t spill_gpr8_opnd = opnd_create_reg(spill_gpr8);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -38892,15 +45823,15 @@ rw_func_kxorb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %al
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr8, TLS_K_idx_SLOT(src1_k_idx), OPSZ_1);
     // xor tls_slot(src2_k_idx), %al
-    instr_t *i4 = INSTR_CREATE_xor(dcontext, spill_gpr8_opnd, 
-                                  OPND_CREATE_MEM8(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_xor(dcontext, spill_gpr8_opnd, OPND_CREATE_MEM8(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %al, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr8, TLS_K_idx_SLOT(dst_k_idx), OPSZ_1);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -38917,21 +45848,21 @@ rw_func_kxorq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -38939,15 +45870,15 @@ rw_func_kxorq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %rax
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr64, TLS_K_idx_SLOT(src1_k_idx), OPSZ_8);
     // xor tls_slot(src2_k_idx), %rax
-    instr_t *i4 = INSTR_CREATE_xor(dcontext, spill_gpr64_opnd, 
-                                  OPND_CREATE_MEM64(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_xor(dcontext, spill_gpr64_opnd, OPND_CREATE_MEM64(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %rax, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr64, TLS_K_idx_SLOT(dst_k_idx), OPSZ_8);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -38964,23 +45895,23 @@ rw_func_kxord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     reg_id_t spill_gpr32 = DR_REG_EAX;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
     opnd_t spill_gpr32_opnd = opnd_create_reg(spill_gpr32);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -38988,15 +45919,15 @@ rw_func_kxord(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %eax
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr32, TLS_K_idx_SLOT(src1_k_idx), OPSZ_4);
     // xor tls_slot(src2_k_idx), %eax
-    instr_t *i4 = INSTR_CREATE_xor(dcontext, spill_gpr32_opnd, 
-                                  OPND_CREATE_MEM32(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_xor(dcontext, spill_gpr32_opnd, OPND_CREATE_MEM32(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %eax, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr32, TLS_K_idx_SLOT(dst_k_idx), OPSZ_4);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -39025,23 +45956,23 @@ rw_func_kaddw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     reg_id_t spill_gpr16 = DR_REG_AX;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
     opnd_t spill_gpr16_opnd = opnd_create_reg(spill_gpr16);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -39049,15 +45980,15 @@ rw_func_kaddw(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %ax
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr16, TLS_K_idx_SLOT(src1_k_idx), OPSZ_2);
     // add tls_slot(src2_k_idx), %ax
-    instr_t *i4 = INSTR_CREATE_add(dcontext, spill_gpr16_opnd, 
-                                  OPND_CREATE_MEM16(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_add(dcontext, spill_gpr16_opnd, OPND_CREATE_MEM16(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %ax, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr16, TLS_K_idx_SLOT(dst_k_idx), OPSZ_2);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -39074,23 +46005,23 @@ rw_func_kaddb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     reg_id_t spill_gpr8 = DR_REG_AL;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
     opnd_t spill_gpr8_opnd = opnd_create_reg(spill_gpr8);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -39098,15 +46029,15 @@ rw_func_kaddb(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %al
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr8, TLS_K_idx_SLOT(src1_k_idx), OPSZ_1);
     // add tls_slot(src2_k_idx), %al
-    instr_t *i4 = INSTR_CREATE_add(dcontext, spill_gpr8_opnd, 
-                                  OPND_CREATE_MEM8(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_add(dcontext, spill_gpr8_opnd, OPND_CREATE_MEM8(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %al, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr8, TLS_K_idx_SLOT(dst_k_idx), OPSZ_1);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -39123,21 +46054,21 @@ rw_func_kaddq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -39145,15 +46076,15 @@ rw_func_kaddq(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %rax
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr64, TLS_K_idx_SLOT(src1_k_idx), OPSZ_8);
     // add tls_slot(src2_k_idx), %rax
-    instr_t *i4 = INSTR_CREATE_add(dcontext, spill_gpr64_opnd, 
-                                  OPND_CREATE_MEM64(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_add(dcontext, spill_gpr64_opnd, OPND_CREATE_MEM64(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %rax, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr64, TLS_K_idx_SLOT(dst_k_idx), OPSZ_8);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
@@ -39170,23 +46101,23 @@ rw_func_kaddd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     opnd_t src_opnd1 = instr_get_src(instr, 0);
     opnd_t src_opnd2 = instr_get_src(instr, 1);
     opnd_t dst_opnd = instr_get_dst(instr, 0);
-    
+
     reg_id_t src_reg1 = opnd_get_reg(src_opnd1);
     reg_id_t src_reg2 = opnd_get_reg(src_opnd2);
     reg_id_t dst_reg = opnd_get_reg(dst_opnd);
-    
+
     uint src1_k_idx = TO_K_REG_INDEX(src_reg1);
     uint src2_k_idx = TO_K_REG_INDEX(src_reg2);
     uint dst_k_idx = TO_K_REG_INDEX(dst_reg);
-    
+
     instrlist_remove(ilist, instr);
     instr_destroy(dcontext, instr);
-    
+
     reg_id_t spill_gpr64 = DR_REG_RAX;
     reg_id_t spill_gpr32 = DR_REG_EAX;
     opnd_t spill_gpr64_opnd = opnd_create_reg(spill_gpr64);
     opnd_t spill_gpr32_opnd = opnd_create_reg(spill_gpr32);
-    
+
     // pushfq
     instr_t *i1 = INSTR_CREATE_pushf(dcontext);
     // push rax
@@ -39194,15 +46125,15 @@ rw_func_kaddd(dcontext_t *dcontext, instrlist_t *ilist, instr_t *instr, app_pc i
     // tls_slot(src1_k_idx) -> %eax
     instr_t *i3 = RESTORE_FROM_SIZED_TLS(dcontext, spill_gpr32, TLS_K_idx_SLOT(src1_k_idx), OPSZ_4);
     // add tls_slot(src2_k_idx), %eax
-    instr_t *i4 = INSTR_CREATE_add(dcontext, spill_gpr32_opnd, 
-                                  OPND_CREATE_MEM32(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
+    instr_t *i4 =
+        INSTR_CREATE_add(dcontext, spill_gpr32_opnd, OPND_CREATE_MEM32(DR_REG_NULL, TLS_K_idx_SLOT(src2_k_idx)));
     // mov %eax, tls_slot(dst_k_idx)
     instr_t *i5 = SAVE_TO_SIZED_TLS(dcontext, spill_gpr32, TLS_K_idx_SLOT(dst_k_idx), OPSZ_4);
     // pop rax
     instr_t *i6 = INSTR_CREATE_pop(dcontext, spill_gpr64_opnd);
     // popfq
     instr_t *i7 = INSTR_CREATE_popf(dcontext);
-    
+
 #ifdef DEBUG
     print_rewrite_variadic_instr(dcontext, 7, i1, i2, i3, i4, i5, i6, i7);
 #endif
