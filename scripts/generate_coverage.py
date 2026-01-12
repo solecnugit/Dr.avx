@@ -56,8 +56,8 @@ def generate_coverage_md(supported_instructions):
 def main():
     # Define paths
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    rewrite_c_path = os.path.join(script_dir, "core", "arch", "rewrite.c")
-    coverage_md_path = os.path.join(script_dir, "docs", "coverage.md")
+    rewrite_c_path = os.path.join(script_dir, "..", "core", "arch", "rewrite.c")
+    coverage_md_path = os.path.join(script_dir, "..", "docs", "coverage.md")
     
     # Extract supported instructions
     supported_instructions = extract_supported_instructions(rewrite_c_path)

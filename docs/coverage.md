@@ -1,6 +1,6 @@
 # AVX512 Instruction Coverage
 
-Currently supported: **159** instructions
+Currently supported: **160** instructions
 
 ## Supported Instructions
 
@@ -129,10 +129,10 @@ Currently supported: **159** instructions
 - OP_AVX512_vpmovzxdq
 - OP_AVX512_vpmovzxwd
 - OP_AVX512_vpmovzxwq
+- OP_AVX512_vpmulld
 - OP_AVX512_vpmullq
 - OP_AVX512_vporq
 - OP_AVX512_vprolq
-- OP_AVX512_vprord
 - OP_AVX512_vprorq
 - OP_AVX512_vpscatterdd
 - OP_AVX512_vpscatterdq
@@ -146,6 +146,7 @@ Currently supported: **159** instructions
 - OP_AVX512_vpsrlq
 - OP_AVX512_vpsubb
 - OP_AVX512_vpsubd
+- OP_AVX512_vpsubq
 - OP_AVX512_vpsubw
 - OP_AVX512_vpxord
 - OP_AVX512_vpxorq
